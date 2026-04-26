@@ -1,15 +1,20 @@
-// Estado Global da Aplicação
+// Configurações Globais
+const PROTECTED_FILES = ['index.html', 'app.js', 'README.md'];
+const STORAGE_LIMIT_SUGGESTED = 50 * 1024 * 1024 * 1024; // 50GB para referência visual
+
 let state = {
     token: localStorage.getItem('gh_token') || '',
     owner: '',
     repo: '',
     currentPath: '',
     files: [],
-    filteredFiles: [],
+    allFilesRecursive: [], // Para cálculo de armazenamento total
+    totalSize: 0,
+    totalCount: 0,
+    modalAction: null, // 'folder' ou 'rename'
     itemToRename: null
 };
 
-// Mapeamento de Elementos DOM
 const elements = {
     authSection: document.getElementById('auth-section'),
     userSection: document.getElementById('user-section'),
@@ -24,17 +29,24 @@ const elements = {
     btnNewFolder: document.getElementById('btn-new-folder'),
     fileUpload: document.getElementById('file-upload'),
     statusMsg: document.getElementById('status-msg'),
-    modalFolder: document.getElementById('modal-folder'),
-    folderNameInput: document.getElementById('folder-name'),
-    btnConfirmFolder: document.getElementById('btn-confirm-folder'),
-    btnCancelFolder: document.getElementById('btn-cancel-folder'),
-    modalRename: document.getElementById('modal-rename'),
-    renameInput: document.getElementById('rename-input'),
-    btnConfirmRename: document.getElementById('btn-confirm-rename'),
-    btnCancelRename: document.getElementById('btn-cancel-rename'),
     searchInput: document.getElementById('search-input'),
     btnRefresh: document.getElementById('btn-refresh'),
-    dropZone: document.getElementById('drop-zone')
+    dropZone: document.getElementById('drop-zone'),
+    // Modal
+    modalInput: document.getElementById('modal-input'),
+    modalTitle: document.getElementById('modal-title'),
+    modalSubtitle: document.getElementById('modal-subtitle'),
+    modalIcon: document.getElementById('modal-icon'),
+    modalIconBg: document.getElementById('modal-icon-bg'),
+    genericInput: document.getElementById('generic-input'),
+    btnModalConfirm: document.getElementById('btn-modal-confirm'),
+    btnModalCancel: document.getElementById('btn-modal-cancel'),
+    // Stats
+    totalStorageUsage: document.getElementById('total-storage-usage'),
+    totalFileCount: document.getElementById('total-file-count'),
+    storageProgress: document.getElementById('storage-progress'),
+    folderFileCount: document.getElementById('folder-file-count'),
+    folderStorageUsage: document.getElementById('folder-storage-usage')
 };
 
 // --- INICIALIZAÇÃO ---
@@ -45,39 +57,36 @@ async function init() {
     }
 }
 
-// --- AUTENTICAÇÃO ---
 async function login() {
     const token = elements.tokenInput.value.trim();
     if (!token) return;
 
     try {
-        updateStatus('A conectar...');
-        const userRes = await fetch('https://api.github.com/user', {
+        updateStatus('A autenticar...');
+        const res = await fetch('https://api.github.com/user', {
             headers: { 'Authorization': `token ${token}` }
         });
-        
-        if (!userRes.ok) throw new Error('Token inválido ou expirado.');
-        const userData = await userRes.json();
-        state.owner = userData.login;
+        if (!res.ok) throw new Error('Token inválido.');
+        const data = await res.json();
+        state.owner = data.login;
 
-        // Tentar obter repo do URL ou pedir
+        // Detectar repo
         const urlParts = window.location.hostname.split('.');
         if (urlParts[1] === 'github' && urlParts[2] === 'io') {
-            state.repo = window.location.pathname.split('/')[1] || prompt("Introduza o nome do repositório:");
+            state.repo = window.location.pathname.split('/')[1];
         } else {
-            state.repo = localStorage.getItem('gh_repo') || prompt("Introduza o nome do repositório para armazenamento:", "github-cloud-storage");
+            state.repo = localStorage.getItem('gh_repo') || prompt("Nome do repositório:", "github-cloud-storage");
         }
 
-        if (!state.repo) return logout();
-        
+        if (!state.repo) return;
         state.token = token;
         localStorage.setItem('gh_token', token);
         localStorage.setItem('gh_repo', state.repo);
-        
-        showAppUI();
-        await loadFiles();
-    } catch (error) {
-        alert(error.message);
+
+        showApp();
+        await refreshAll();
+    } catch (e) {
+        alert(e.message);
         logout();
     }
 }
@@ -91,7 +100,7 @@ function logout() {
     elements.appContent.classList.add('hidden');
 }
 
-function showAppUI() {
+function showApp() {
     elements.authSection.classList.add('hidden');
     elements.userSection.classList.remove('hidden');
     elements.welcomeScreen.classList.add('hidden');
@@ -99,12 +108,16 @@ function showAppUI() {
     elements.repoInfo.textContent = `${state.owner}/${state.repo}`;
 }
 
-// --- OPERAÇÕES DE FICHEIROS (CRUD) ---
+// --- GESTÃO DE DADOS & ESTATÍSTICAS ---
 
-// 1. READ (Listar e Pesquisar)
+async function refreshAll() {
+    await loadFiles();
+    await calculateTotalStorage();
+}
+
 async function loadFiles(path = state.currentPath) {
     state.currentPath = path;
-    updateStatus('A ler diretório...');
+    updateStatus('A ler pasta...');
     renderBreadcrumbs();
     
     try {
@@ -113,91 +126,146 @@ async function loadFiles(path = state.currentPath) {
             cache: 'no-store'
         });
         
-        if (res.status === 404) {
-            state.files = [];
-        } else if (!res.ok) {
-            throw new Error('Erro ao aceder ao repositório.');
-        } else {
-            state.files = await res.json();
-        }
-        
-        state.filteredFiles = [...state.files];
+        state.files = res.ok ? await res.json() : [];
         renderFileList();
+        updateFolderStats();
         updateStatus('');
-    } catch (error) {
+    } catch (e) {
         updateStatus('Erro na leitura.');
-        console.error(error);
     }
 }
+
+async function calculateTotalStorage() {
+    try {
+        // Usar a API de Recursão (Trees) para obter todos os ficheiros de uma vez
+        // Primeiro precisamos do SHA do branch principal
+        const branchRes = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/branches/main`, {
+            headers: { 'Authorization': `token ${state.token}` }
+        });
+        const branchData = await branchRes.json();
+        const treeSha = branchData.commit.commit.tree.sha;
+
+        const treeRes = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/git/trees/${treeSha}?recursive=1`, {
+            headers: { 'Authorization': `token ${state.token}` }
+        });
+        const treeData = await treeRes.json();
+        
+        const filesOnly = treeData.tree.filter(item => item.type === 'blob');
+        state.totalCount = filesOnly.length;
+        
+        // Infelizmente a Tree API não devolve o tamanho. Precisamos de somar os tamanhos da listagem se quisermos precisão,
+        // ou aceitar que o armazenamento total é a soma dos ficheiros conhecidos.
+        // Como a Tree API não dá size, vamos estimar ou fazer fetch se necessário. 
+        // Para performance, vamos somar apenas o que temos na pasta atual + cache se tivéssemos.
+        // Alternativa: A API de Repositório dá o "size" do repo em KB.
+        const repoRes = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}`, {
+            headers: { 'Authorization': `token ${state.token}` }
+        });
+        const repoData = await repoRes.json();
+        state.totalSize = repoData.size * 1024; // Repo size é em KB
+
+        updateTotalStatsUI();
+    } catch (e) {
+        console.error("Erro ao calcular storage total:", e);
+    }
+}
+
+function updateTotalStatsUI() {
+    elements.totalStorageUsage.textContent = formatBytes(state.totalSize);
+    elements.totalFileCount.textContent = `${state.totalCount} ficheiros no total`;
+    const percent = Math.min((state.totalSize / STORAGE_LIMIT_SUGGESTED) * 100, 100);
+    elements.storageProgress.style.width = `${percent}%`;
+}
+
+function updateFolderStats() {
+    const folderFiles = state.files.filter(f => f.type === 'file');
+    const folderSize = folderFiles.reduce((acc, f) => acc + f.size, 0);
+    elements.folderFileCount.textContent = folderFiles.length;
+    elements.folderStorageUsage.textContent = formatBytes(folderSize);
+}
+
+// --- RENDERIZAÇÃO ---
 
 function renderFileList() {
     elements.fileList.innerHTML = '';
     
-    if (state.filteredFiles.length === 0) {
-        elements.fileList.innerHTML = `
-            <div class="p-20 text-center">
-                <i class="fas fa-folder-open text-gray-200 text-6xl mb-4"></i>
-                <p class="text-gray-400 font-medium">Nenhum ficheiro encontrado nesta pasta.</p>
-            </div>`;
+    if (state.files.length === 0) {
+        elements.fileList.innerHTML = '<div class="p-20 text-center text-slate-300 font-bold">Pasta Vazia</div>';
         return;
     }
 
-    const sorted = state.filteredFiles.sort((a, b) => {
+    const sorted = [...state.files].sort((a, b) => {
         if (a.type === b.type) return a.name.localeCompare(b.name);
         return a.type === 'dir' ? -1 : 1;
     });
 
     sorted.forEach(file => {
         const isDir = file.type === 'dir';
+        const isProtected = PROTECTED_FILES.includes(file.name) && state.currentPath === '';
+        
         const item = document.createElement('div');
-        item.className = 'file-item grid grid-cols-12 gap-4 px-6 py-4 items-center transition cursor-pointer border-b border-gray-50';
+        item.className = `file-item grid grid-cols-12 gap-4 px-8 py-5 items-center transition cursor-pointer border-b border-slate-50 ${isProtected ? 'system-file' : ''}`;
         
         item.innerHTML = `
             <div class="col-span-7 md:col-span-8 flex items-center gap-4 overflow-hidden">
-                <div class="w-10 h-10 rounded-xl ${isDir ? 'bg-yellow-50 text-yellow-500' : 'bg-blue-50 text-blue-500'} flex items-center justify-center flex-shrink-0">
-                    <i class="fas ${isDir ? 'fa-folder' : 'fa-file'} text-lg"></i>
+                <div class="w-12 h-12 rounded-2xl ${isDir ? 'bg-amber-50 text-amber-500' : 'bg-indigo-50 text-indigo-500'} flex items-center justify-center flex-shrink-0 border border-white shadow-sm">
+                    <i class="fas ${isDir ? 'fa-folder' : 'fa-file-alt'} text-xl"></i>
                 </div>
-                <span class="truncate font-semibold text-gray-700">${file.name}</span>
+                <div class="flex flex-col overflow-hidden">
+                    <span class="truncate font-bold text-slate-700 text-sm">${file.name}</span>
+                    ${isProtected ? '<span class="text-[9px] font-black text-amber-600 uppercase tracking-tighter"><i class="fas fa-lock mr-1"></i>Sistema Protegido</span>' : ''}
+                </div>
             </div>
-            <div class="col-span-3 md:col-span-2 text-right text-xs font-bold text-gray-400">${isDir ? '--' : formatBytes(file.size)}</div>
+            <div class="col-span-3 md:col-span-2 text-right text-xs font-black text-slate-400">${isDir ? '--' : formatBytes(file.size)}</div>
             <div class="col-span-2 text-right flex justify-end gap-1">
-                <button class="btn-rename p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-blue-600 transition" title="Renomear">
-                    <i class="fas fa-pen text-xs"></i>
-                </button>
-                <button class="btn-delete p-2 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500 transition" title="Eliminar">
-                    <i class="fas fa-trash-alt text-xs"></i>
-                </button>
+                ${!isProtected ? `
+                    <button class="btn-rename p-2.5 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition">
+                        <i class="fas fa-pen text-xs"></i>
+                    </button>
+                    <button class="btn-delete p-2.5 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-500 transition">
+                        <i class="fas fa-trash-alt text-xs"></i>
+                    </button>
+                ` : `
+                    <div class="p-2.5 text-slate-200"><i class="fas fa-shield-alt text-xs"></i></div>
+                `}
             </div>
         `;
 
-        item.addEventListener('click', (e) => {
+        item.onclick = (e) => {
             if (e.target.closest('button')) return;
             if (isDir) loadFiles(file.path);
             else window.open(file.download_url || file.html_url, '_blank');
-        });
+        };
 
-        item.querySelector('.btn-rename').onclick = (e) => { e.stopPropagation(); openRenameModal(file); };
-        item.querySelector('.btn-delete').onclick = (e) => { e.stopPropagation(); deleteItem(file); };
+        if (!isProtected) {
+            item.querySelector('.btn-rename').onclick = (e) => { e.stopPropagation(); openModal('rename', file); };
+            item.querySelector('.btn-delete').onclick = (e) => { e.stopPropagation(); deleteItem(file); };
+        }
 
         elements.fileList.appendChild(item);
     });
 }
 
-// 2. CREATE (Pastas e Uploads)
-async function createFolder() {
-    const name = elements.folderNameInput.value.trim();
-    if (!name) return;
+// --- OPERAÇÕES CRUD ---
 
-    const path = `${state.currentPath ? state.currentPath + '/' : ''}${name}/.keep`;
-    try {
-        updateStatus('A criar pasta...');
-        await uploadToGithub(path, 'Pasta criada', 'Created via UI');
-        elements.modalFolder.classList.add('hidden');
-        elements.folderNameInput.value = '';
-        await loadFiles();
-    } catch (error) {
-        alert('Erro: ' + error.message);
+async function deleteItem(file) {
+    if (PROTECTED_FILES.includes(file.name) && state.currentPath === '') {
+        return alert("Este ficheiro é crítico para o funcionamento da aplicação e não pode ser eliminado.");
     }
+
+    if (!confirm(`Deseja eliminar permanentemente "${file.name}"?`)) return;
+
+    try {
+        updateStatus('A eliminar...');
+        const res = await fetch(file.url, {
+            method: 'DELETE',
+            headers: { 'Authorization': `token ${state.token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: `Delete ${file.name}`, sha: file.sha })
+        });
+
+        if (!res.ok) throw new Error('Erro ao eliminar.');
+        await refreshAll();
+    } catch (e) { alert(e.message); }
 }
 
 async function handleFileUpload(e) {
@@ -205,139 +273,107 @@ async function handleFileUpload(e) {
     if (!files.length) return;
 
     for (const file of files) {
+        if (PROTECTED_FILES.includes(file.name) && state.currentPath === '') {
+            if (!confirm(`O ficheiro "${file.name}" é um ficheiro de sistema. Deseja substituí-lo? (Não recomendado)`)) continue;
+        }
+
         try {
             updateStatus(`A enviar ${file.name}...`);
             const content = await readFileAsBase64(file);
             const path = `${state.currentPath ? state.currentPath + '/' : ''}${file.name}`;
             await uploadToGithub(path, content, `Upload: ${file.name}`, true);
-        } catch (error) {
-            alert(`Erro no upload de ${file.name}: ` + error.message);
-        }
+        } catch (e) { alert(`Erro em ${file.name}: ${e.message}`); }
     }
-    await loadFiles();
+    await refreshAll();
     elements.fileUpload.value = '';
 }
 
-// 3. UPDATE (Renomear)
-// Nota: No GitHub API, "renomear" é um DELETE seguido de um PUT (Create)
-function openRenameModal(file) {
-    state.itemToRename = file;
-    elements.renameInput.value = file.name;
-    elements.modalRename.classList.remove('hidden');
-    elements.renameInput.focus();
-}
-
-async function confirmRename() {
-    const newName = elements.renameInput.value.trim();
-    const file = state.itemToRename;
-    if (!newName || !file || newName === file.name) {
-        elements.modalRename.classList.add('hidden');
-        return;
-    }
-
-    try {
-        updateStatus('A renomear...');
-        elements.modalRename.classList.add('hidden');
-
-        if (file.type === 'dir') {
-            alert("A renomeação de pastas requer a movimentação de todos os ficheiros internos. Esta funcionalidade está limitada na API REST simples. Por favor, renomeie os ficheiros individualmente.");
-            updateStatus('');
-            return;
-        }
-
-        // 1. Obter conteúdo do ficheiro atual
-        const getRes = await fetch(file.url, {
-            headers: { 'Authorization': `token ${state.token}` }
-        });
-        const data = await getRes.json();
-        
-        // 2. Criar novo ficheiro com o novo nome
-        const newPath = file.path.replace(file.name, newName);
-        await uploadToGithub(newPath, data.content, `Renamed ${file.name} to ${newName}`, true);
-        
-        // 3. Eliminar o antigo
-        await fetch(file.url, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `token ${state.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: `Removed old file after rename`,
-                sha: file.sha
-            })
-        });
-
-        await loadFiles();
-    } catch (error) {
-        alert('Erro ao renomear: ' + error.message);
-    }
-}
-
-// 4. DELETE
-async function deleteItem(file) {
-    if (!confirm(`Tem a certeza que deseja eliminar "${file.name}"?`)) return;
-
-    try {
-        updateStatus(`A eliminar ${file.name}...`);
-        
-        if (file.type === 'dir') {
-            // Para pastas, precisamos de eliminar o conteúdo recursivamente ou o .keep
-            // Esta é uma simplificação: eliminamos o que a API nos der (geralmente ficheiros individuais)
-            alert("Para eliminar pastas no GitHub via API, deve eliminar todos os ficheiros dentro dela primeiro.");
-            updateStatus('');
-            return;
-        }
-
-        const res = await fetch(file.url, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `token ${state.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: `Deleted ${file.name}`,
-                sha: file.sha
-            })
-        });
-
-        if (!res.ok) throw new Error('Não foi possível eliminar o ficheiro.');
-        await loadFiles();
-    } catch (error) {
-        alert(error.message);
-    }
-}
-
-// --- AUXILIARES DA API ---
 async function uploadToGithub(path, content, message, isBase64 = false) {
     let sha = null;
-    try {
-        const check = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/contents/${path}`, {
-            headers: { 'Authorization': `token ${state.token}` }
-        });
-        if (check.ok) {
-            const data = await check.json();
-            sha = data.sha;
-        }
-    } catch (e) {}
+    const check = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/contents/${path}`, {
+        headers: { 'Authorization': `token ${state.token}` }
+    });
+    if (check.ok) {
+        const data = await check.json();
+        sha = data.sha;
+    }
 
     const res = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/contents/${path}`, {
         method: 'PUT',
-        headers: {
-            'Authorization': `token ${state.token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            message,
-            content: isBase64 ? content : btoa(content),
-            sha
-        })
+        headers: { 'Authorization': `token ${state.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, content: isBase64 ? content : btoa(content), sha })
     });
+    if (!res.ok) throw new Error('Falha no upload.');
+}
 
-    if (!res.ok) throw new Error('Falha na comunicação com o GitHub.');
+// --- MODAL & RENOMEAÇÃO ---
+
+function openModal(type, item = null) {
+    state.modalAction = type;
+    state.itemToRename = item;
+    elements.modalInput.classList.remove('hidden');
+    elements.genericInput.focus();
+
+    if (type === 'folder') {
+        elements.modalTitle.textContent = "Nova Pasta";
+        elements.modalSubtitle.textContent = "Criação de Diretório";
+        elements.modalIcon.className = "fas fa-folder-plus text-amber-600";
+        elements.modalIconBg.className = "bg-amber-100 p-4 rounded-2xl";
+        elements.genericInput.value = "";
+        elements.genericInput.placeholder = "Ex: Documentos";
+    } else {
+        elements.modalTitle.textContent = "Renomear";
+        elements.modalSubtitle.textContent = "Alteração de Ficheiro";
+        elements.modalIcon.className = "fas fa-edit text-indigo-600";
+        elements.modalIconBg.className = "bg-indigo-100 p-4 rounded-2xl";
+        elements.genericInput.value = item.name;
+    }
+}
+
+async function handleModalConfirm() {
+    const value = elements.genericInput.value.trim();
+    if (!value) return;
+
+    if (state.modalAction === 'folder') {
+        const path = `${state.currentPath ? state.currentPath + '/' : ''}${value}/.keep`;
+        try {
+            updateStatus('A criar pasta...');
+            await uploadToGithub(path, 'Pasta criada', 'Created via UI');
+            closeModal();
+            await refreshAll();
+        } catch (e) { alert(e.message); }
+    } else {
+        const file = state.itemToRename;
+        if (value === file.name) return closeModal();
+        
+        try {
+            updateStatus('A renomear...');
+            // 1. Get content
+            const getRes = await fetch(file.url, { headers: { 'Authorization': `token ${state.token}` } });
+            const data = await getRes.json();
+            // 2. Create new
+            const newPath = file.path.replace(file.name, value);
+            await uploadToGithub(newPath, data.content, `Renamed ${file.name} to ${value}`, true);
+            // 3. Delete old
+            await fetch(file.url, {
+                method: 'DELETE',
+                headers: { 'Authorization': `token ${state.token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: `Rename cleanup`, sha: file.sha })
+            });
+            closeModal();
+            await refreshAll();
+        } catch (e) { alert(e.message); }
+    }
+}
+
+function closeModal() {
+    elements.modalInput.classList.add('hidden');
+    state.modalAction = null;
+    state.itemToRename = null;
 }
 
 // --- UTILITÁRIOS ---
+
 function formatBytes(bytes) {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -360,49 +396,42 @@ function updateStatus(msg) {
 }
 
 function renderBreadcrumbs() {
-    elements.breadcrumbs.innerHTML = `
-        <li><a href="#" class="text-blue-600 hover:underline" onclick="loadFiles('')">Raiz</a></li>`;
-    
+    elements.breadcrumbs.innerHTML = `<li><a href="#" class="text-indigo-600 hover:text-indigo-800 transition" onclick="loadFiles('')">Raiz</a></li>`;
     if (!state.currentPath) return;
-
     const parts = state.currentPath.split('/');
-    let pathAcc = '';
-    parts.forEach((part, i) => {
-        pathAcc += (i === 0 ? '' : '/') + part;
-        const current = pathAcc;
+    let acc = '';
+    parts.forEach((p, i) => {
+        acc += (i === 0 ? '' : '/') + p;
+        const current = acc;
         elements.breadcrumbs.innerHTML += `
-            <li class="flex items-center">
-                <i class="fas fa-chevron-right text-gray-300 mx-2 text-[10px]"></i>
-                <a href="#" class="${i === parts.length - 1 ? 'text-gray-400' : 'text-blue-600 hover:underline'}" 
-                   onclick="${i === parts.length - 1 ? '' : `loadFiles('${current}')`}">${part}</a>
+            <li class="flex items-center gap-2">
+                <i class="fas fa-chevron-right text-slate-300 text-[10px]"></i>
+                <a href="#" class="${i === parts.length - 1 ? 'text-slate-400 cursor-default' : 'text-indigo-600 hover:text-indigo-800 transition'}" 
+                   onclick="${i === parts.length - 1 ? '' : `loadFiles('${current}')`}">${p}</a>
             </li>`;
     });
 }
 
-// --- EVENT LISTENERS ---
+// --- LISTENERS ---
 elements.btnLogin.onclick = login;
 elements.btnLogout.onclick = logout;
-elements.btnRefresh.onclick = () => loadFiles();
-elements.btnNewFolder.onclick = () => elements.modalFolder.classList.remove('hidden');
-elements.btnCancelFolder.onclick = () => elements.modalFolder.classList.add('hidden');
-elements.btnConfirmFolder.onclick = createFolder;
-elements.btnCancelRename.onclick = () => elements.modalRename.classList.add('hidden');
-elements.btnConfirmRename.onclick = confirmRename;
+elements.btnRefresh.onclick = refreshAll;
+elements.btnNewFolder.onclick = () => openModal('folder');
+elements.btnModalCancel.onclick = closeModal;
+elements.btnModalConfirm.onclick = handleModalConfirm;
 elements.fileUpload.onchange = handleFileUpload;
 
 elements.searchInput.oninput = (e) => {
     const term = e.target.value.toLowerCase();
-    state.filteredFiles = state.files.filter(f => f.name.toLowerCase().includes(term));
-    renderFileList();
+    const items = document.querySelectorAll('.file-item');
+    items.forEach(item => {
+        const name = item.querySelector('span').textContent.toLowerCase();
+        item.style.display = name.includes(term) ? 'grid' : 'none';
+    });
 };
 
-// Drag and Drop
-elements.dropZone.ondragover = (e) => { e.preventDefault(); elements.dropZone.classList.add('bg-blue-50/50'); };
-elements.dropZone.ondragleave = () => elements.dropZone.classList.remove('bg-blue-50/50');
-elements.dropZone.ondrop = (e) => {
-    e.preventDefault();
-    elements.dropZone.classList.remove('bg-blue-50/50');
-    handleFileUpload(e);
-};
+elements.dropZone.ondragover = (e) => { e.preventDefault(); elements.dropZone.classList.add('bg-indigo-50/30'); };
+elements.dropZone.ondragleave = () => elements.dropZone.classList.remove('bg-indigo-50/30');
+elements.dropZone.ondrop = (e) => { e.preventDefault(); elements.dropZone.classList.remove('bg-indigo-50/30'); handleFileUpload(e); };
 
 init();
