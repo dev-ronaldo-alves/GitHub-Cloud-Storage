@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub Cloud Storage - Ultimate</title>
+    <title>GitHub Cloud Storage - Enterprise</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -23,7 +23,7 @@
                 </div>
                 <div>
                     <h1 class="text-2xl font-black tracking-tight">GitHub <span class="text-indigo-600">Cloud</span></h1>
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Storage Manager v3.0</p>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Storage Manager v4.0</p>
                 </div>
             </div>
             
@@ -78,10 +78,10 @@
                 <div class="bg-amber-50 p-5 rounded-3xl border border-amber-100">
                     <div class="flex items-center gap-2 mb-2">
                         <i class="fas fa-shield-alt text-amber-600 text-sm"></i>
-                        <h4 class="text-xs font-bold text-amber-800">Ficheiros Protegidos</h4>
+                        <h4 class="text-xs font-bold text-amber-800">Segurança de Sistema</h4>
                     </div>
                     <p class="text-[10px] text-amber-700 leading-relaxed font-medium">
-                        <code>index.html</code> e <code>app.js</code> estão bloqueados para garantir que a sua aplicação continue a funcionar.
+                        <code>index.html</code>, <code>app.js</code> e a pasta <code>assets/</code> estão bloqueados para proteger a integridade da aplicação.
                     </p>
                 </div>
             </div>
@@ -141,35 +141,35 @@
             <div class="w-24 h-24 bg-indigo-50 rounded-3xl flex items-center justify-center mx-auto mb-10 transform -rotate-6">
                 <i class="fas fa-cloud-upload-alt text-5xl text-indigo-600"></i>
             </div>
-            <h2 class="text-4xl font-black text-slate-900 mb-6 tracking-tight">O seu ecossistema de nuvem pessoal</h2>
-            <p class="text-slate-500 mb-12 leading-relaxed text-lg font-medium">Gerencie ficheiros diretamente no seu repositório GitHub com estatísticas em tempo real e proteção de dados.</p>
+            <h2 class="text-4xl font-black text-slate-900 mb-6 tracking-tight">Enterprise Storage no GitHub</h2>
+            <p class="text-slate-500 mb-12 leading-relaxed text-lg font-medium">Gestão profissional de ficheiros com movimentação entre pastas e proteção de diretórios críticos.</p>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                <div class="p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-indigo-200 transition">
-                    <i class="fas fa-chart-pie text-indigo-500 text-xl mb-3"></i>
-                    <h4 class="font-bold text-sm mb-1">Estatísticas</h4>
-                    <p class="text-[10px] text-slate-400">Contagem de uso por pasta e total.</p>
+                <div class="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                    <i class="fas fa-exchange-alt text-indigo-500 text-xl mb-3"></i>
+                    <h4 class="font-bold text-sm mb-1">Mover Itens</h4>
+                    <p class="text-[10px] text-slate-400">Mova ficheiros entre qualquer pasta.</p>
                 </div>
-                <div class="p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-indigo-200 transition">
-                    <i class="fas fa-shield-check text-green-500 text-xl mb-3"></i>
-                    <h4 class="font-bold text-sm mb-1">Proteção</h4>
-                    <p class="text-[10px] text-slate-400">Sistema contra eliminação acidental.</p>
+                <div class="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                    <i class="fas fa-folder-lock text-amber-500 text-xl mb-3"></i>
+                    <h4 class="font-bold text-sm mb-1">Assets Protegidos</h4>
+                    <p class="text-[10px] text-slate-400">Proteção total da pasta de recursos.</p>
                 </div>
-                <div class="p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-indigo-200 transition">
-                    <i class="fas fa-bolt text-amber-500 text-xl mb-3"></i>
-                    <h4 class="font-bold text-sm mb-1">Full CRUD</h4>
-                    <p class="text-[10px] text-slate-400">Gestão completa de ficheiros e pastas.</p>
+                <div class="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                    <i class="fas fa-hdd text-green-500 text-xl mb-3"></i>
+                    <h4 class="font-bold text-sm mb-1">50 GB</h4>
+                    <p class="text-[10px] text-slate-400">Capacidade expandida para gestão.</p>
                 </div>
             </div>
 
             <button onclick="document.getElementById('github-token').focus()" class="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black hover:bg-indigo-600 transition shadow-xl shadow-slate-200">
-                Começar Agora
+                Aceder ao Painel
             </button>
         </div>
     </div>
 
     <!-- Modals -->
-    <!-- Modal genérico para inputs (Pasta/Renomear) -->
+    <!-- Modal genérico para inputs (Pasta/Renomear/Mover) -->
     <div id="modal-input" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-[2.5rem] p-10 w-full max-w-md shadow-2xl transform transition-all">
             <div class="flex items-center gap-4 mb-8">
@@ -181,7 +181,19 @@
                     <p id="modal-subtitle" class="text-xs font-bold text-slate-400 uppercase tracking-widest"></p>
                 </div>
             </div>
-            <input type="text" id="generic-input" class="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl mb-8 focus:ring-4 focus:ring-indigo-500/10 outline-none transition font-medium">
+            
+            <div id="move-folder-select-container" class="hidden mb-6">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Selecionar Pasta de Destino:</p>
+                <select id="move-folder-select" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-sm">
+                    <!-- Pastas dinâmicas -->
+                </select>
+            </div>
+
+            <div id="generic-input-container">
+                <p id="input-label" class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Nome:</p>
+                <input type="text" id="generic-input" class="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl mb-8 focus:ring-4 focus:ring-indigo-500/10 outline-none transition font-medium">
+            </div>
+
             <div class="flex justify-end gap-3">
                 <button id="btn-modal-cancel" class="px-8 py-4 text-slate-500 font-black hover:bg-slate-100 rounded-2xl transition">Cancelar</button>
                 <button id="btn-modal-confirm" class="px-8 py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition">Confirmar</button>

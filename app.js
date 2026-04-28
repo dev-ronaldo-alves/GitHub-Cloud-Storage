@@ -1,6 +1,7 @@
 // Configurações Globais
 const PROTECTED_FILES = ['index.html', 'app.js', 'README.md'];
-const STORAGE_LIMIT_SUGGESTED = 50 * 1024 * 1024 * 1024; // 50GB para referência visual
+const PROTECTED_FOLDERS = ['assets'];
+const STORAGE_LIMIT_SUGGESTED = 50 * 1024 * 1024 * 1024; // 50GB
 
 let state = {
     token: localStorage.getItem('gh_token') || '',
@@ -8,11 +9,11 @@ let state = {
     repo: '',
     currentPath: '',
     files: [],
-    allFilesRecursive: [], // Para cálculo de armazenamento total
+    allFolders: [], // Para o seletor de movimentação
     totalSize: 0,
     totalCount: 0,
-    modalAction: null, // 'folder' ou 'rename'
-    itemToRename: null
+    modalAction: null, // 'folder', 'rename', 'move'
+    activeItem: null
 };
 
 const elements = {
@@ -39,6 +40,9 @@ const elements = {
     modalIcon: document.getElementById('modal-icon'),
     modalIconBg: document.getElementById('modal-icon-bg'),
     genericInput: document.getElementById('generic-input'),
+    genericInputContainer: document.getElementById('generic-input-container'),
+    moveFolderSelectContainer: document.getElementById('move-folder-select-container'),
+    moveFolderSelect: document.getElementById('move-folder-select'),
     btnModalConfirm: document.getElementById('btn-modal-confirm'),
     btnModalCancel: document.getElementById('btn-modal-cancel'),
     // Stats
@@ -70,7 +74,6 @@ async function login() {
         const data = await res.json();
         state.owner = data.login;
 
-        // Detectar repo
         const urlParts = window.location.hostname.split('.');
         if (urlParts[1] === 'github' && urlParts[2] === 'io') {
             state.repo = window.location.pathname.split('/')[1];
@@ -108,16 +111,16 @@ function showApp() {
     elements.repoInfo.textContent = `${state.owner}/${state.repo}`;
 }
 
-// --- GESTÃO DE DADOS & ESTATÍSTICAS ---
+// --- GESTÃO DE DADOS ---
 
 async function refreshAll() {
     await loadFiles();
-    await calculateTotalStorage();
+    await calculateStats();
 }
 
 async function loadFiles(path = state.currentPath) {
     state.currentPath = path;
-    updateStatus('A ler pasta...');
+    updateStatus('A ler diretório...');
     renderBreadcrumbs();
     
     try {
@@ -135,17 +138,20 @@ async function loadFiles(path = state.currentPath) {
     }
 }
 
-async function calculateTotalStorage() {
+async function calculateStats() {
     try {
-        // Usar a API de Recursão (Trees) para obter todos os ficheiros de uma vez
-        // Primeiro precisamos do SHA do branch principal
+        const repoRes = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}`, {
+            headers: { 'Authorization': `token ${state.token}` }
+        });
+        const repoData = await repoRes.json();
+        state.totalSize = repoData.size * 1024;
+
         const branchRes = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/branches/main`, {
             headers: { 'Authorization': `token ${state.token}` }
         });
         const branchData = await branchRes.json();
-        const treeSha = branchData.commit.commit.tree.sha;
-
-        const treeRes = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/git/trees/${treeSha}?recursive=1`, {
+        
+        const treeRes = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/git/trees/${branchData.commit.commit.tree.sha}?recursive=1`, {
             headers: { 'Authorization': `token ${state.token}` }
         });
         const treeData = await treeRes.json();
@@ -153,24 +159,17 @@ async function calculateTotalStorage() {
         const filesOnly = treeData.tree.filter(item => item.type === 'blob');
         state.totalCount = filesOnly.length;
         
-        // Infelizmente a Tree API não devolve o tamanho. Precisamos de somar os tamanhos da listagem se quisermos precisão,
-        // ou aceitar que o armazenamento total é a soma dos ficheiros conhecidos.
-        // Como a Tree API não dá size, vamos estimar ou fazer fetch se necessário. 
-        // Para performance, vamos somar apenas o que temos na pasta atual + cache se tivéssemos.
-        // Alternativa: A API de Repositório dá o "size" do repo em KB.
-        const repoRes = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}`, {
-            headers: { 'Authorization': `token ${state.token}` }
-        });
-        const repoData = await repoRes.json();
-        state.totalSize = repoData.size * 1024; // Repo size é em KB
+        // Guardar todas as pastas para o seletor de movimentação
+        state.allFolders = treeData.tree.filter(item => item.type === 'tree').map(item => item.path);
+        state.allFolders.unshift(''); // Raiz
 
-        updateTotalStatsUI();
+        updateStatsUI();
     } catch (e) {
-        console.error("Erro ao calcular storage total:", e);
+        console.error("Erro nas estatísticas:", e);
     }
 }
 
-function updateTotalStatsUI() {
+function updateStatsUI() {
     elements.totalStorageUsage.textContent = formatBytes(state.totalSize);
     elements.totalFileCount.textContent = `${state.totalCount} ficheiros no total`;
     const percent = Math.min((state.totalSize / STORAGE_LIMIT_SUGGESTED) * 100, 100);
@@ -201,7 +200,9 @@ function renderFileList() {
 
     sorted.forEach(file => {
         const isDir = file.type === 'dir';
-        const isProtected = PROTECTED_FILES.includes(file.name) && state.currentPath === '';
+        const isProtectedFile = PROTECTED_FILES.includes(file.name) && state.currentPath === '';
+        const isProtectedFolder = PROTECTED_FOLDERS.includes(file.name) && state.currentPath === '';
+        const isProtected = isProtectedFile || isProtectedFolder;
         
         const item = document.createElement('div');
         item.className = `file-item grid grid-cols-12 gap-4 px-8 py-5 items-center transition cursor-pointer border-b border-slate-50 ${isProtected ? 'system-file' : ''}`;
@@ -213,20 +214,23 @@ function renderFileList() {
                 </div>
                 <div class="flex flex-col overflow-hidden">
                     <span class="truncate font-bold text-slate-700 text-sm">${file.name}</span>
-                    ${isProtected ? '<span class="text-[9px] font-black text-amber-600 uppercase tracking-tighter"><i class="fas fa-lock mr-1"></i>Sistema Protegido</span>' : ''}
+                    ${isProtected ? `<span class="text-[9px] font-black ${isProtectedFolder ? 'text-amber-600' : 'text-indigo-600'} uppercase tracking-tighter"><i class="fas fa-shield-alt mr-1"></i>Protegido</span>` : ''}
                 </div>
             </div>
             <div class="col-span-3 md:col-span-2 text-right text-xs font-black text-slate-400">${isDir ? '--' : formatBytes(file.size)}</div>
             <div class="col-span-2 text-right flex justify-end gap-1">
                 ${!isProtected ? `
-                    <button class="btn-rename p-2.5 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition">
+                    <button class="btn-move p-2.5 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition" title="Mover">
+                        <i class="fas fa-exchange-alt text-xs"></i>
+                    </button>
+                    <button class="btn-rename p-2.5 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition" title="Renomear">
                         <i class="fas fa-pen text-xs"></i>
                     </button>
-                    <button class="btn-delete p-2.5 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-500 transition">
+                    <button class="btn-delete p-2.5 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-500 transition" title="Eliminar">
                         <i class="fas fa-trash-alt text-xs"></i>
                     </button>
                 ` : `
-                    <div class="p-2.5 text-slate-200"><i class="fas fa-shield-alt text-xs"></i></div>
+                    <div class="p-2.5 text-slate-200"><i class="fas fa-lock text-xs"></i></div>
                 `}
             </div>
         `;
@@ -238,6 +242,7 @@ function renderFileList() {
         };
 
         if (!isProtected) {
+            item.querySelector('.btn-move').onclick = (e) => { e.stopPropagation(); openModal('move', file); };
             item.querySelector('.btn-rename').onclick = (e) => { e.stopPropagation(); openModal('rename', file); };
             item.querySelector('.btn-delete').onclick = (e) => { e.stopPropagation(); deleteItem(file); };
         }
@@ -249,11 +254,7 @@ function renderFileList() {
 // --- OPERAÇÕES CRUD ---
 
 async function deleteItem(file) {
-    if (PROTECTED_FILES.includes(file.name) && state.currentPath === '') {
-        return alert("Este ficheiro é crítico para o funcionamento da aplicação e não pode ser eliminado.");
-    }
-
-    if (!confirm(`Deseja eliminar permanentemente "${file.name}"?`)) return;
+    if (!confirm(`Deseja eliminar "${file.name}"?`)) return;
 
     try {
         updateStatus('A eliminar...');
@@ -262,30 +263,9 @@ async function deleteItem(file) {
             headers: { 'Authorization': `token ${state.token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: `Delete ${file.name}`, sha: file.sha })
         });
-
         if (!res.ok) throw new Error('Erro ao eliminar.');
         await refreshAll();
     } catch (e) { alert(e.message); }
-}
-
-async function handleFileUpload(e) {
-    const files = e.target.files || e.dataTransfer.files;
-    if (!files.length) return;
-
-    for (const file of files) {
-        if (PROTECTED_FILES.includes(file.name) && state.currentPath === '') {
-            if (!confirm(`O ficheiro "${file.name}" é um ficheiro de sistema. Deseja substituí-lo? (Não recomendado)`)) continue;
-        }
-
-        try {
-            updateStatus(`A enviar ${file.name}...`);
-            const content = await readFileAsBase64(file);
-            const path = `${state.currentPath ? state.currentPath + '/' : ''}${file.name}`;
-            await uploadToGithub(path, content, `Upload: ${file.name}`, true);
-        } catch (e) { alert(`Erro em ${file.name}: ${e.message}`); }
-    }
-    await refreshAll();
-    elements.fileUpload.value = '';
 }
 
 async function uploadToGithub(path, content, message, isBase64 = false) {
@@ -306,70 +286,88 @@ async function uploadToGithub(path, content, message, isBase64 = false) {
     if (!res.ok) throw new Error('Falha no upload.');
 }
 
-// --- MODAL & RENOMEAÇÃO ---
+// --- MODAL & LOGICA DE MOVIMENTAÇÃO ---
 
 function openModal(type, item = null) {
     state.modalAction = type;
-    state.itemToRename = item;
+    state.activeItem = item;
     elements.modalInput.classList.remove('hidden');
-    elements.genericInput.focus();
+    
+    // Reset views
+    elements.genericInputContainer.classList.add('hidden');
+    elements.moveFolderSelectContainer.classList.add('hidden');
 
     if (type === 'folder') {
         elements.modalTitle.textContent = "Nova Pasta";
-        elements.modalSubtitle.textContent = "Criação de Diretório";
+        elements.modalSubtitle.textContent = "Criação";
         elements.modalIcon.className = "fas fa-folder-plus text-amber-600";
         elements.modalIconBg.className = "bg-amber-100 p-4 rounded-2xl";
+        elements.genericInputContainer.classList.remove('hidden');
         elements.genericInput.value = "";
-        elements.genericInput.placeholder = "Ex: Documentos";
-    } else {
+        elements.genericInput.focus();
+    } else if (type === 'rename') {
         elements.modalTitle.textContent = "Renomear";
-        elements.modalSubtitle.textContent = "Alteração de Ficheiro";
+        elements.modalSubtitle.textContent = "Alteração";
         elements.modalIcon.className = "fas fa-edit text-indigo-600";
         elements.modalIconBg.className = "bg-indigo-100 p-4 rounded-2xl";
+        elements.genericInputContainer.classList.remove('hidden');
         elements.genericInput.value = item.name;
+        elements.genericInput.focus();
+    } else if (type === 'move') {
+        elements.modalTitle.textContent = "Mover Item";
+        elements.modalSubtitle.textContent = "Transferência";
+        elements.modalIcon.className = "fas fa-exchange-alt text-indigo-600";
+        elements.modalIconBg.className = "bg-indigo-100 p-4 rounded-2xl";
+        elements.moveFolderSelectContainer.classList.remove('hidden');
+        
+        // Popular seletor
+        elements.moveFolderSelect.innerHTML = '';
+        state.allFolders.forEach(f => {
+            const opt = document.createElement('option');
+            opt.value = f;
+            opt.textContent = f === '' ? '/ (Raiz)' : f;
+            elements.moveFolderSelect.appendChild(opt);
+        });
     }
 }
 
 async function handleModalConfirm() {
     const value = elements.genericInput.value.trim();
-    if (!value) return;
+    const targetFolder = elements.moveFolderSelect.value;
 
-    if (state.modalAction === 'folder') {
-        const path = `${state.currentPath ? state.currentPath + '/' : ''}${value}/.keep`;
-        try {
+    try {
+        if (state.modalAction === 'folder') {
+            if (!value) return;
             updateStatus('A criar pasta...');
-            await uploadToGithub(path, 'Pasta criada', 'Created via UI');
-            closeModal();
-            await refreshAll();
-        } catch (e) { alert(e.message); }
-    } else {
-        const file = state.itemToRename;
-        if (value === file.name) return closeModal();
-        
-        try {
+            await uploadToGithub(`${state.currentPath ? state.currentPath + '/' : ''}${value}/.keep`, 'Pasta criada', 'Created via UI');
+        } else if (state.modalAction === 'rename') {
+            if (!value || value === state.activeItem.name) return closeModal();
             updateStatus('A renomear...');
-            // 1. Get content
+            const getRes = await fetch(state.activeItem.url, { headers: { 'Authorization': `token ${state.token}` } });
+            const data = await getRes.json();
+            const newPath = state.activeItem.path.replace(state.activeItem.name, value);
+            await uploadToGithub(newPath, data.content, `Renamed to ${value}`, true);
+            await fetch(state.activeItem.url, { method: 'DELETE', headers: { 'Authorization': `token ${state.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Cleanup', sha: state.activeItem.sha }) });
+        } else if (state.modalAction === 'move') {
+            const file = state.activeItem;
+            const newPath = `${targetFolder ? targetFolder + '/' : ''}${file.name}`;
+            if (newPath === file.path) return closeModal();
+            
+            updateStatus('A mover...');
             const getRes = await fetch(file.url, { headers: { 'Authorization': `token ${state.token}` } });
             const data = await getRes.json();
-            // 2. Create new
-            const newPath = file.path.replace(file.name, value);
-            await uploadToGithub(newPath, data.content, `Renamed ${file.name} to ${value}`, true);
-            // 3. Delete old
-            await fetch(file.url, {
-                method: 'DELETE',
-                headers: { 'Authorization': `token ${state.token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: `Rename cleanup`, sha: file.sha })
-            });
-            closeModal();
-            await refreshAll();
-        } catch (e) { alert(e.message); }
-    }
+            await uploadToGithub(newPath, data.content, `Moved ${file.name} to ${targetFolder}`, true);
+            await fetch(file.url, { method: 'DELETE', headers: { 'Authorization': `token ${state.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Cleanup after move', sha: file.sha }) });
+        }
+        closeModal();
+        await refreshAll();
+    } catch (e) { alert(e.message); }
 }
 
 function closeModal() {
     elements.modalInput.classList.add('hidden');
     state.modalAction = null;
-    state.itemToRename = null;
+    state.activeItem = null;
 }
 
 // --- UTILITÁRIOS ---
@@ -377,7 +375,7 @@ function closeModal() {
 function formatBytes(bytes) {
     if (bytes === 0) return '0 B';
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
@@ -391,9 +389,7 @@ function readFileAsBase64(file) {
     });
 }
 
-function updateStatus(msg) {
-    elements.statusMsg.textContent = msg;
-}
+function updateStatus(msg) { elements.statusMsg.textContent = msg; }
 
 function renderBreadcrumbs() {
     elements.breadcrumbs.innerHTML = `<li><a href="#" class="text-indigo-600 hover:text-indigo-800 transition" onclick="loadFiles('')">Raiz</a></li>`;
@@ -403,12 +399,7 @@ function renderBreadcrumbs() {
     parts.forEach((p, i) => {
         acc += (i === 0 ? '' : '/') + p;
         const current = acc;
-        elements.breadcrumbs.innerHTML += `
-            <li class="flex items-center gap-2">
-                <i class="fas fa-chevron-right text-slate-300 text-[10px]"></i>
-                <a href="#" class="${i === parts.length - 1 ? 'text-slate-400 cursor-default' : 'text-indigo-600 hover:text-indigo-800 transition'}" 
-                   onclick="${i === parts.length - 1 ? '' : `loadFiles('${current}')`}">${p}</a>
-            </li>`;
+        elements.breadcrumbs.innerHTML += `<li class="flex items-center gap-2"><i class="fas fa-chevron-right text-slate-300 text-[10px]"></i><a href="#" class="${i === parts.length - 1 ? 'text-slate-400 cursor-default' : 'text-indigo-600 hover:text-indigo-800 transition'}" onclick="${i === parts.length - 1 ? '' : `loadFiles('${current}')`}">${p}</a></li>`;
     });
 }
 
@@ -419,19 +410,31 @@ elements.btnRefresh.onclick = refreshAll;
 elements.btnNewFolder.onclick = () => openModal('folder');
 elements.btnModalCancel.onclick = closeModal;
 elements.btnModalConfirm.onclick = handleModalConfirm;
-elements.fileUpload.onchange = handleFileUpload;
+elements.fileUpload.onchange = (e) => {
+    const files = e.target.files;
+    if (!files.length) return;
+    (async () => {
+        for (const f of files) {
+            try {
+                updateStatus(`A enviar ${f.name}...`);
+                const content = await readFileAsBase64(f);
+                await uploadToGithub(`${state.currentPath ? state.currentPath + '/' : ''}${f.name}`, content, `Upload: ${f.name}`, true);
+            } catch (e) { alert(e.message); }
+        }
+        await refreshAll();
+        elements.fileUpload.value = '';
+    })();
+};
 
 elements.searchInput.oninput = (e) => {
     const term = e.target.value.toLowerCase();
-    const items = document.querySelectorAll('.file-item');
-    items.forEach(item => {
-        const name = item.querySelector('span').textContent.toLowerCase();
-        item.style.display = name.includes(term) ? 'grid' : 'none';
+    document.querySelectorAll('.file-item').forEach(item => {
+        item.style.display = item.querySelector('span').textContent.toLowerCase().includes(term) ? 'grid' : 'none';
     });
 };
 
 elements.dropZone.ondragover = (e) => { e.preventDefault(); elements.dropZone.classList.add('bg-indigo-50/30'); };
 elements.dropZone.ondragleave = () => elements.dropZone.classList.remove('bg-indigo-50/30');
-elements.dropZone.ondrop = (e) => { e.preventDefault(); elements.dropZone.classList.remove('bg-indigo-50/30'); handleFileUpload(e); };
+elements.dropZone.ondrop = (e) => { e.preventDefault(); elements.dropZone.classList.remove('bg-indigo-50/30'); elements.fileUpload.onchange({target: {files: e.dataTransfer.files}}); };
 
 init();
