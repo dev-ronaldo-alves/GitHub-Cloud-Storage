@@ -9,10 +9,10 @@ let state = {
     repo: '',
     currentPath: '',
     files: [],
-    allFolders: [], // Para o seletor de movimentação
+    allFolders: [],
     totalSize: 0,
     totalCount: 0,
-    modalAction: null, // 'folder', 'rename', 'move'
+    modalAction: null,
     activeItem: null
 };
 
@@ -33,7 +33,6 @@ const elements = {
     searchInput: document.getElementById('search-input'),
     btnRefresh: document.getElementById('btn-refresh'),
     dropZone: document.getElementById('drop-zone'),
-    // Modal
     modalInput: document.getElementById('modal-input'),
     modalTitle: document.getElementById('modal-title'),
     modalSubtitle: document.getElementById('modal-subtitle'),
@@ -45,7 +44,6 @@ const elements = {
     moveFolderSelect: document.getElementById('move-folder-select'),
     btnModalConfirm: document.getElementById('btn-modal-confirm'),
     btnModalCancel: document.getElementById('btn-modal-cancel'),
-    // Stats
     totalStorageUsage: document.getElementById('total-storage-usage'),
     totalFileCount: document.getElementById('total-file-count'),
     storageProgress: document.getElementById('storage-progress'),
@@ -53,12 +51,119 @@ const elements = {
     folderStorageUsage: document.getElementById('folder-storage-usage')
 };
 
+// --- MODAL DE PRÉ-VISUALIZAÇÃO (criado dinamicamente) ---
+function createPreviewModal() {
+    if (document.getElementById('preview-modal')) return;
+
+    const modalHTML = `
+        <div id="preview-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-300">
+            <div class="bg-white rounded-3xl shadow-2xl w-11/12 max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                <div class="flex items-center justify-between p-5 border-b border-slate-100">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-indigo-100 p-2 rounded-xl"><i class="fas fa-eye text-indigo-600"></i></div>
+                        <div>
+                            <h3 class="font-black text-slate-800" id="preview-filename">Pré-visualização</h3>
+                            <p class="text-xs text-slate-400" id="preview-filesize"></p>
+                        </div>
+                    </div>
+                    <button id="close-preview" class="w-8 h-8 rounded-full hover:bg-slate-100 transition flex items-center justify-center text-slate-400 hover:text-red-500">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="preview-content" class="flex-1 overflow-auto p-6 bg-slate-50 flex items-center justify-center">
+                    <div class="text-center text-slate-400"><i class="fas fa-spinner fa-pulse text-2xl mb-2 block"></i> A carregar...</div>
+                </div>
+                <div class="p-4 border-t border-slate-100 flex justify-end gap-3">
+                    <a id="preview-download-link" href="#" target="_blank" class="px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 text-sm font-bold hover:bg-indigo-100 transition flex items-center gap-2">
+                        <i class="fas fa-external-link-alt"></i> Abrir original
+                    </a>
+                    <button id="preview-close-btn" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold hover:bg-slate-200 transition">
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // Eventos do modal
+    const modal = document.getElementById('preview-modal');
+    const closeBtn = document.getElementById('close-preview');
+    const closeBtn2 = document.getElementById('preview-close-btn');
+    const closeModal = () => modal.classList.add('hidden');
+    closeBtn.onclick = closeModal;
+    closeBtn2.onclick = closeModal;
+    modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+}
+
+async function openPreview(file) {
+    if (file.type !== 'file') return;
+    createPreviewModal();
+
+    const modal = document.getElementById('preview-modal');
+    const filenameSpan = document.getElementById('preview-filename');
+    const filesizeSpan = document.getElementById('preview-filesize');
+    const contentDiv = document.getElementById('preview-content');
+    const downloadLink = document.getElementById('preview-download-link');
+
+    filenameSpan.textContent = file.name;
+    filesizeSpan.textContent = formatBytes(file.size);
+    downloadLink.href = file.download_url || file.html_url;
+    contentDiv.innerHTML = `<div class="text-center text-slate-400"><i class="fas fa-spinner fa-pulse text-2xl mb-2 block"></i> A carregar conteúdo...</div>`;
+
+    modal.classList.remove('hidden');
+
+    // Verificar se é imagem pela extensão
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'];
+    const ext = file.name.split('.').pop().toLowerCase();
+    const isImage = imageExtensions.includes(ext);
+
+    if (isImage && file.download_url) {
+        // Pré-visualização de imagem
+        const img = document.createElement('img');
+        img.src = file.download_url;
+        img.alt = file.name;
+        img.className = 'max-w-full max-h-[70vh] object-contain rounded-xl shadow-md';
+        img.onload = () => {
+            contentDiv.innerHTML = '';
+            contentDiv.appendChild(img);
+        };
+        img.onerror = () => {
+            contentDiv.innerHTML = `<div class="text-center text-red-500"><i class="fas fa-image-slash text-4xl mb-2 block"></i> Não foi possível carregar a imagem.</div>`;
+        };
+        return;
+    }
+
+    // Ficheiros de texto (limite de 1MB)
+    const textExtensions = ['txt', 'md', 'js', 'html', 'css', 'json', 'xml', 'svg', 'sh', 'py', 'rb', 'php', 'java', 'c', 'cpp', 'h', 'csv', 'log'];
+    const isText = textExtensions.includes(ext) || file.name.includes('.env') || file.name.includes('.gitignore');
+
+    if (isText && file.size < 1024 * 1024) {
+        try {
+            const response = await fetch(file.download_url);
+            if (!response.ok) throw new Error();
+            const text = await response.text();
+            const pre = document.createElement('pre');
+            pre.className = 'text-sm font-mono bg-slate-800 text-slate-100 p-4 rounded-xl overflow-auto max-h-[60vh] whitespace-pre-wrap';
+            pre.textContent = text;
+            contentDiv.innerHTML = '';
+            contentDiv.appendChild(pre);
+        } catch (err) {
+            contentDiv.innerHTML = `<div class="text-center text-red-500"><i class="fas fa-file-alt text-4xl mb-2 block"></i> Erro ao carregar o texto.<br><a href="${file.download_url}" target="_blank" class="text-indigo-600 underline">Descarregar ficheiro</a></div>`;
+        }
+    } else {
+        // Outros formatos (PDF, ZIP, etc.)
+        contentDiv.innerHTML = `<div class="text-center text-slate-500"><i class="fas fa-file fa-4x mb-4 text-slate-300"></i><p class="mb-4">Pré-visualização não disponível para este tipo de ficheiro.</p><a href="${file.download_url}" target="_blank" class="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition"><i class="fas fa-download"></i> Descarregar ficheiro</a></div>`;
+    }
+}
+
 // --- INICIALIZAÇÃO ---
 async function init() {
     if (state.token) {
         elements.tokenInput.value = state.token;
         await login();
     }
+    createPreviewModal(); // prepara o modal vazio
 }
 
 async function login() {
@@ -111,8 +216,7 @@ function showApp() {
     elements.repoInfo.textContent = `${state.owner}/${state.repo}`;
 }
 
-// --- GESTÃO DE DADOS ---
-
+// --- GESTÃO DE DADOS (as funções existentes permanecem iguais) ---
 async function refreshAll() {
     await loadFiles();
     await calculateStats();
@@ -159,9 +263,8 @@ async function calculateStats() {
         const filesOnly = treeData.tree.filter(item => item.type === 'blob');
         state.totalCount = filesOnly.length;
         
-        // Guardar todas as pastas para o seletor de movimentação
         state.allFolders = treeData.tree.filter(item => item.type === 'tree').map(item => item.path);
-        state.allFolders.unshift(''); // Raiz
+        state.allFolders.unshift('');
 
         updateStatsUI();
     } catch (e) {
@@ -183,8 +286,7 @@ function updateFolderStats() {
     elements.folderStorageUsage.textContent = formatBytes(folderSize);
 }
 
-// --- RENDERIZAÇÃO ---
-
+// --- RENDERIZAÇÃO (com botão de pré-visualização) ---
 function renderFileList() {
     elements.fileList.innerHTML = '';
     
@@ -208,7 +310,7 @@ function renderFileList() {
         item.className = `file-item grid grid-cols-12 gap-4 px-8 py-5 items-center transition cursor-pointer border-b border-slate-50 ${isProtected ? 'system-file' : ''}`;
         
         item.innerHTML = `
-            <div class="col-span-7 md:col-span-8 flex items-center gap-4 overflow-hidden">
+            <div class="col-span-7 md:col-span-7 flex items-center gap-4 overflow-hidden">
                 <div class="w-12 h-12 rounded-2xl ${isDir ? 'bg-amber-50 text-amber-500' : 'bg-indigo-50 text-indigo-500'} flex items-center justify-center flex-shrink-0 border border-white shadow-sm">
                     <i class="fas ${isDir ? 'fa-folder' : 'fa-file-alt'} text-xl"></i>
                 </div>
@@ -219,6 +321,11 @@ function renderFileList() {
             </div>
             <div class="col-span-3 md:col-span-2 text-right text-xs font-black text-slate-400">${isDir ? '--' : formatBytes(file.size)}</div>
             <div class="col-span-2 text-right flex justify-end gap-1">
+                ${!isProtected && !isDir ? `
+                    <button class="btn-preview p-2.5 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition" title="Pré-visualizar">
+                        <i class="fas fa-eye text-xs"></i>
+                    </button>
+                ` : ''}
                 ${!isProtected ? `
                     <button class="btn-move p-2.5 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition" title="Mover">
                         <i class="fas fa-exchange-alt text-xs"></i>
@@ -235,13 +342,16 @@ function renderFileList() {
             </div>
         `;
 
+        // Evento de clique na linha (para navegar nas pastas OU pré-visualizar ficheiro)
         item.onclick = (e) => {
             if (e.target.closest('button')) return;
             if (isDir) loadFiles(file.path);
-            else window.open(file.download_url || file.html_url, '_blank');
+            else openPreview(file);  // Pré-visualiza ficheiro
         };
 
         if (!isProtected) {
+            const previewBtn = item.querySelector('.btn-preview');
+            if (previewBtn) previewBtn.onclick = (e) => { e.stopPropagation(); openPreview(file); };
             item.querySelector('.btn-move').onclick = (e) => { e.stopPropagation(); openModal('move', file); };
             item.querySelector('.btn-rename').onclick = (e) => { e.stopPropagation(); openModal('rename', file); };
             item.querySelector('.btn-delete').onclick = (e) => { e.stopPropagation(); deleteItem(file); };
@@ -251,8 +361,7 @@ function renderFileList() {
     });
 }
 
-// --- OPERAÇÕES CRUD ---
-
+// --- OPERAÇÕES CRUD (mantidas intactas) ---
 async function deleteItem(file) {
     if (!confirm(`Deseja eliminar "${file.name}"?`)) return;
 
@@ -286,14 +395,12 @@ async function uploadToGithub(path, content, message, isBase64 = false) {
     if (!res.ok) throw new Error('Falha no upload.');
 }
 
-// --- MODAL & LOGICA DE MOVIMENTAÇÃO ---
-
+// --- MODAL & LOGICA DE MOVIMENTAÇÃO (igual à original) ---
 function openModal(type, item = null) {
     state.modalAction = type;
     state.activeItem = item;
     elements.modalInput.classList.remove('hidden');
     
-    // Reset views
     elements.genericInputContainer.classList.add('hidden');
     elements.moveFolderSelectContainer.classList.add('hidden');
 
@@ -320,7 +427,6 @@ function openModal(type, item = null) {
         elements.modalIconBg.className = "bg-indigo-100 p-4 rounded-2xl";
         elements.moveFolderSelectContainer.classList.remove('hidden');
         
-        // Popular seletor
         elements.moveFolderSelect.innerHTML = '';
         state.allFolders.forEach(f => {
             const opt = document.createElement('option');
@@ -371,7 +477,6 @@ function closeModal() {
 }
 
 // --- UTILITÁRIOS ---
-
 function formatBytes(bytes) {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -403,7 +508,7 @@ function renderBreadcrumbs() {
     });
 }
 
-// --- LISTENERS ---
+// --- LISTENERS (existentes, com pequeno ajuste no drop) ---
 elements.btnLogin.onclick = login;
 elements.btnLogout.onclick = logout;
 elements.btnRefresh.onclick = refreshAll;
