@@ -8,15 +8,46 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
+        /* Estilos base existentes */
         .file-item:hover { background-color: #f8fafc; }
         #drop-zone.dragover { border-color: #3b82f6; background-color: #eff6ff; }
         .system-file { opacity: 0.6; }
         .progress-bar { transition: width 0.5s ease-in-out; }
+        
+        /* Suporte para line-clamp (útil no modo grelha) */
+        .line-clamp-1 {
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+        }
+        .line-clamp-2 {
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        .line-clamp-3 {
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+        }
+        
+        /* Transição suave para mudança de visualização */
+        #file-list {
+            transition: all 0.2s ease;
+        }
+        
+        /* Ajuste para os cards no modo grelha */
+        .file-item.group:hover {
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen font-sans text-slate-900">
     <div class="container mx-auto px-4 py-6 max-w-6xl">
-        <!-- Header -->
+        <!-- Header (inalterado) -->
         <header class="flex flex-col lg:flex-row justify-between items-center mb-8 gap-6">
             <div class="flex items-center gap-4">
                 <div class="bg-indigo-600 p-3 rounded-2xl shadow-lg shadow-indigo-200">
@@ -45,9 +76,8 @@
         </header>
 
         <main id="app-content" class="hidden grid grid-cols-12 gap-6">
-            <!-- Sidebar / Stats -->
+            <!-- Sidebar / Stats (inalterado) -->
             <div class="col-span-12 lg:col-span-3 space-y-6">
-                <!-- Total Storage Card -->
                 <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
                     <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Armazenamento Total</h3>
                     <div class="flex items-end gap-2 mb-2">
@@ -60,7 +90,6 @@
                     <p class="text-[10px] text-slate-400 mt-2">Capacidade Máxima Definida: 50GB</p>
                 </div>
 
-                <!-- Current Folder Stats -->
                 <div class="bg-indigo-600 p-6 rounded-3xl shadow-lg shadow-indigo-100 text-white">
                     <h3 class="text-xs font-bold text-indigo-200 uppercase tracking-widest mb-4">Nesta Pasta</h3>
                     <div class="space-y-4">
@@ -75,7 +104,6 @@
                     </div>
                 </div>
 
-                <!-- Protected Info -->
                 <div class="bg-amber-50 p-5 rounded-3xl border border-amber-100">
                     <div class="flex items-center gap-2 mb-2">
                         <i class="fas fa-shield-alt text-amber-600 text-sm"></i>
@@ -89,7 +117,7 @@
 
             <!-- Main Content Area -->
             <div class="col-span-12 lg:col-span-9 space-y-6">
-                <!-- Top Bar -->
+                <!-- Top Bar (breadcrumbs e pesquisa) -->
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <nav class="flex text-sm font-bold" aria-label="Breadcrumb">
                         <ol class="inline-flex items-center space-x-2" id="breadcrumbs"></ol>
@@ -121,9 +149,10 @@
                         </div>
                     </div>
 
-                    <!-- File List -->
+                    <!-- File List (os controlos de visualização serão injetados aqui pelo JS) -->
                     <div id="drop-zone" class="transition-all min-h-[500px]">
-                        <div class="grid grid-cols-12 gap-4 px-8 py-4 bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">
+                        <!-- Cabeçalho da lista (escondido automaticamente no modo grelha) -->
+                        <div id="list-header" class="grid grid-cols-12 gap-4 px-8 py-4 bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">
                             <div class="col-span-7 md:col-span-8">Nome</div>
                             <div class="col-span-3 md:col-span-2 text-right">Tamanho</div>
                             <div class="col-span-2 text-right">Ações</div>
@@ -136,7 +165,7 @@
             </div>
         </main>
 
-        <!-- Welcome Screen -->
+        <!-- Welcome Screen (inalterado) -->
         <div id="welcome-screen" class="bg-white p-10 lg:p-20 rounded-[3rem] shadow-xl border border-slate-100 text-center max-w-3xl mx-auto mt-12 relative overflow-hidden">
             <div class="absolute top-0 left-0 w-full h-2 bg-indigo-600"></div>
             <div class="w-24 h-24 bg-indigo-50 rounded-3xl flex items-center justify-center mx-auto mb-10 transform -rotate-6">
@@ -169,8 +198,7 @@
         </div>
     </div>
 
-    <!-- Modals -->
-    <!-- Modal genérico para inputs (Pasta/Renomear/Mover) -->
+    <!-- Modal genérico para inputs (Pasta/Renomear/Mover) – inalterado -->
     <div id="modal-input" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-[2.5rem] p-10 w-full max-w-md shadow-2xl transform transition-all">
             <div class="flex items-center gap-4 mb-8">
