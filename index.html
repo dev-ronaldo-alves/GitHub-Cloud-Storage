@@ -99,13 +99,6 @@
                 padding-right: 0.75rem !important;
                 gap: 0.5rem !important;
             }
-            
-            /* Esconder coluna de tamanho no mobile se necessário */
-            @media (max-width: 480px) {
-                .file-item .text-right:first-of-type {
-                    font-size: 0.7rem;
-                }
-            }
         }
         
         /* Prevenir overflow em elementos específicos */
@@ -130,7 +123,7 @@
             transition-duration: 200ms;
         }
         
-        /* Scrollbar personalizada (opcional) */
+        /* Scrollbar personalizada */
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
@@ -265,6 +258,10 @@
                             <div class="col-span-3 md:col-span-2 text-right hidden sm:block">Tamanho</div>
                             <div class="col-span-5 sm:col-span-2 text-right">Ações</div>
                         </div>
+                        
+                        <!-- Container para os controlos de visualização (serão injetados aqui pelo JS) -->
+                        <div id="view-controls-container"></div>
+                        
                         <div id="file-list" class="divide-y divide-slate-50">
                             <!-- Ficheiros dinâmicos -->
                         </div>
