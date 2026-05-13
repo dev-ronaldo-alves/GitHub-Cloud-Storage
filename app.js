@@ -53,32 +53,50 @@ const elements = {
     folderStorageUsage: document.getElementById('folder-storage-usage')
 };
 
-// --- BARRA DE CONTROLO VISUAL (criada dinamicamente) ---
+// --- BARRA DE CONTROLO VISUAL ---
 function createViewControls() {
     if (document.getElementById('view-controls')) return;
+    
     const controlsHtml = `
-        <div id="view-controls" class="flex items-center justify-between gap-3 mb-5 p-2 bg-white/50 rounded-2xl border border-slate-100">
-            <div class="flex gap-2">
-                <button id="view-list-btn" class="view-mode-btn px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-indigo-600 text-white shadow-md">
+        <div id="view-controls" class="p-4 border-b border-slate-50 bg-white">
+            <!-- Botões Lista/Grelha -->
+            <div class="flex gap-2 mb-3">
+                <button id="view-list-btn" class="view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md">
                     <i class="fas fa-list-ul"></i> Lista
                 </button>
-                <button id="view-grid-btn" class="view-mode-btn px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200">
+                <button id="view-grid-btn" class="view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200">
                     <i class="fas fa-th-large"></i> Grelha
                 </button>
             </div>
-            <div id="size-controls" class="flex items-center gap-3 ${state.viewMode === 'list' ? 'hidden' : ''}">
-                <span class="text-xs text-slate-400 font-bold"><i class="fas fa-arrows-alt"></i> Tamanho</span>
-                <button id="size-sm" class="size-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-500">P</button>
-                <button id="size-md" class="size-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-100 text-indigo-600">M</button>
-                <button id="size-lg" class="size-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-500">G</button>
-                <button id="size-xl" class="size-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-500">XG</button>
+            
+            <!-- Botões de Tamanho -->
+            <div id="size-controls" class="flex gap-2 ${state.viewMode === 'list' ? 'hidden' : ''}">
+                <button id="size-sm" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'small' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
+                    <i class="fas fa-th"></i> P
+                </button>
+                <button id="size-md" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'medium' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
+                    <i class="fas fa-th-large"></i> M
+                </button>
+                <button id="size-lg" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'large' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
+                    <i class="fas fa-border-all"></i> G
+                </button>
+                <button id="size-xl" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'xlarge' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
+                    <i class="fas fa-arrows-alt"></i> XG
+                </button>
             </div>
         </div>
     `;
-    const breadcrumbsContainer = elements.breadcrumbs.parentElement;
-    if (breadcrumbsContainer && !document.getElementById('view-controls')) {
-        breadcrumbsContainer.insertAdjacentHTML('afterend', controlsHtml);
+    
+    const viewControlsContainer = document.getElementById('view-controls-container');
+    if (viewControlsContainer && !document.getElementById('view-controls')) {
+        viewControlsContainer.innerHTML = controlsHtml;
+    } else if (!document.getElementById('view-controls')) {
+        const listHeader = document.getElementById('list-header');
+        if (listHeader) {
+            listHeader.insertAdjacentHTML('afterend', controlsHtml);
+        }
     }
+    
     document.getElementById('view-list-btn')?.addEventListener('click', () => setViewMode('list'));
     document.getElementById('view-grid-btn')?.addEventListener('click', () => setViewMode('grid'));
     document.getElementById('size-sm')?.addEventListener('click', () => setIconSize('small'));
@@ -93,16 +111,17 @@ function setViewMode(mode) {
     const gridBtn = document.getElementById('view-grid-btn');
     const sizeControls = document.getElementById('size-controls');
     const listHeader = document.getElementById('list-header');
+    
     if (listBtn && gridBtn) {
         if (mode === 'list') {
-            listBtn.className = "view-mode-btn px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-indigo-600 text-white shadow-md";
-            gridBtn.className = "view-mode-btn px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200";
-            sizeControls?.classList.add('hidden');
+            listBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md";
+            gridBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200";
+            if (sizeControls) sizeControls.classList.add('hidden');
             if (listHeader) listHeader.style.display = 'grid';
         } else {
-            listBtn.className = "view-mode-btn px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200";
-            gridBtn.className = "view-mode-btn px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-indigo-600 text-white shadow-md";
-            sizeControls?.classList.remove('hidden');
+            listBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200";
+            gridBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md";
+            if (sizeControls) sizeControls.classList.remove('hidden');
             if (listHeader) listHeader.style.display = 'none';
         }
     }
@@ -111,18 +130,26 @@ function setViewMode(mode) {
 
 function setIconSize(size) {
     state.iconSize = size;
-    ['small', 'medium', 'large', 'xlarge'].forEach(s => {
-        const btn = document.getElementById(`size-${s === 'small' ? 'sm' : s === 'medium' ? 'md' : s === 'large' ? 'lg' : 'xl'}`);
+    const sizes = ['small', 'medium', 'large', 'xlarge'];
+    const sizeIds = { small: 'sm', medium: 'md', large: 'lg', xlarge: 'xl' };
+    
+    sizes.forEach(s => {
+        const btn = document.getElementById(`size-${sizeIds[s]}`);
         if (btn) {
-            btn.className = s === size ? `size-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-100 text-indigo-600` : `size-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-500`;
+            if (s === size) {
+                btn.className = `size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all bg-indigo-100 text-indigo-600 border border-indigo-200`;
+            } else {
+                btn.className = `size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all bg-slate-100 text-slate-500 hover:bg-slate-200`;
+            }
         }
     });
     renderFileList();
 }
 
-// --- MODAL DE PRÉ-VISUALIZAÇÃO (completo) ---
+// --- MODAL DE PRÉ-VISUALIZAÇÃO ---
 function createPreviewModal() {
     if (document.getElementById('preview-modal')) return;
+    
     const modalHTML = `
         <div id="preview-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-300">
             <div class="bg-white rounded-3xl shadow-2xl w-11/12 max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -153,6 +180,7 @@ function createPreviewModal() {
         </div>
     `;
     document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
     const modal = document.getElementById('preview-modal');
     const closeBtn = document.getElementById('close-preview');
     const closeBtn2 = document.getElementById('preview-close-btn');
@@ -165,19 +193,23 @@ function createPreviewModal() {
 async function openPreview(file) {
     if (file.type !== 'file') return;
     createPreviewModal();
+    
     const modal = document.getElementById('preview-modal');
     const filenameSpan = document.getElementById('preview-filename');
     const filesizeSpan = document.getElementById('preview-filesize');
     const contentDiv = document.getElementById('preview-content');
     const downloadLink = document.getElementById('preview-download-link');
+    
     filenameSpan.textContent = file.name;
     filesizeSpan.textContent = formatBytes(file.size);
     downloadLink.href = file.download_url || file.html_url;
     contentDiv.innerHTML = `<div class="text-center text-slate-400"><i class="fas fa-spinner fa-pulse text-2xl mb-2 block"></i> A carregar conteúdo...</div>`;
     modal.classList.remove('hidden');
+    
     const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'];
     const ext = file.name.split('.').pop().toLowerCase();
     const isImage = imageExtensions.includes(ext);
+    
     if (isImage && file.download_url) {
         const img = document.createElement('img');
         img.src = file.download_url;
@@ -187,8 +219,10 @@ async function openPreview(file) {
         img.onerror = () => { contentDiv.innerHTML = `<div class="text-center text-red-500"><i class="fas fa-image-slash text-4xl mb-2 block"></i> Não foi possível carregar a imagem.</div>`; };
         return;
     }
+    
     const textExtensions = ['txt', 'md', 'js', 'html', 'css', 'json', 'xml', 'svg', 'sh', 'py', 'rb', 'php', 'java', 'c', 'cpp', 'h', 'csv', 'log'];
     const isText = textExtensions.includes(ext) || file.name.includes('.env') || file.name.includes('.gitignore');
+    
     if (isText && file.size < 1024 * 1024) {
         try {
             const response = await fetch(file.download_url);
@@ -212,12 +246,15 @@ function getFileIcon(file) {
     if (file.type === 'dir') {
         return `<div class="flex items-center justify-center w-full h-full text-amber-500"><i class="fas fa-folder-open text-4xl"></i></div>`;
     }
+    
     const ext = file.name.split('.').pop().toLowerCase();
     const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'];
     const isImage = imageExts.includes(ext);
+    
     if (isImage && file.download_url) {
         return `<img src="${file.download_url}" alt="${file.name}" class="w-full h-full object-cover rounded-xl" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'flex items-center justify-center w-full h-full text-slate-400\'><i class=\'fas fa-image-slash text-3xl\'></i></div>';">`;
     }
+    
     let iconClass = 'fa-file-alt';
     if (['pdf'].includes(ext)) iconClass = 'fa-file-pdf';
     else if (['doc', 'docx'].includes(ext)) iconClass = 'fa-file-word';
@@ -228,6 +265,7 @@ function getFileIcon(file) {
     else if (['mp4', 'avi', 'mkv', 'mov'].includes(ext)) iconClass = 'fa-file-video';
     else if (['txt', 'md', 'log'].includes(ext)) iconClass = 'fa-file-alt';
     else if (['js', 'html', 'css', 'json', 'xml', 'py', 'java', 'c', 'cpp'].includes(ext)) iconClass = 'fa-code';
+    
     return `<div class="flex items-center justify-center w-full h-full text-indigo-400"><i class="fas ${iconClass} text-5xl"></i></div>`;
 }
 
@@ -237,37 +275,42 @@ function renderListView() {
         if (a.type === b.type) return a.name.localeCompare(b.name);
         return a.type === 'dir' ? -1 : 1;
     });
+    
     elements.fileList.innerHTML = '';
     if (state.files.length === 0) {
         elements.fileList.innerHTML = '<div class="p-20 text-center text-slate-300 font-bold">Pasta Vazia</div>';
         return;
     }
+    
     sorted.forEach(file => {
         const isDir = file.type === 'dir';
         const isProtected = (PROTECTED_FILES.includes(file.name) && state.currentPath === '') || (PROTECTED_FOLDERS.includes(file.name) && state.currentPath === '');
         const item = document.createElement('div');
-        item.className = `file-item grid grid-cols-12 gap-4 px-8 py-5 items-center transition cursor-pointer border-b border-slate-50 ${isProtected ? 'system-file' : ''}`;
+        item.className = `file-item grid grid-cols-12 gap-2 md:gap-4 px-3 md:px-8 py-4 md:py-5 items-center transition cursor-pointer border-b border-slate-50 ${isProtected ? 'system-file' : ''}`;
+        
         item.innerHTML = `
-            <div class="col-span-7 md:col-span-7 flex items-center gap-4 overflow-hidden">
-                <div class="w-12 h-12 rounded-2xl ${isDir ? 'bg-amber-50 text-amber-500' : 'bg-indigo-50 text-indigo-500'} flex items-center justify-center flex-shrink-0 border border-white shadow-sm">
-                    <i class="fas ${isDir ? 'fa-folder' : 'fa-file-alt'} text-xl"></i>
+            <div class="col-span-7 md:col-span-8 flex items-center gap-3 md:gap-4 overflow-hidden">
+                <div class="w-10 h-10 md:w-12 md:h-12 rounded-2xl ${isDir ? 'bg-amber-50 text-amber-500' : 'bg-indigo-50 text-indigo-500'} flex items-center justify-center flex-shrink-0 border border-white shadow-sm">
+                    <i class="fas ${isDir ? 'fa-folder' : 'fa-file-alt'} text-base md:text-xl"></i>
                 </div>
                 <div class="flex flex-col overflow-hidden">
-                    <span class="truncate font-bold text-slate-700 text-sm">${escapeHtml(file.name)}</span>
-                    ${isProtected ? `<span class="text-[9px] font-black text-indigo-600 uppercase tracking-tighter"><i class="fas fa-shield-alt mr-1"></i>Protegido</span>` : ''}
+                    <span class="truncate font-bold text-slate-700 text-xs md:text-sm">${escapeHtml(file.name)}</span>
+                    ${isProtected ? `<span class="text-[8px] md:text-[9px] font-black text-indigo-600 uppercase tracking-tighter"><i class="fas fa-shield-alt mr-1"></i>Protegido</span>` : ''}
                 </div>
             </div>
-            <div class="col-span-3 md:col-span-2 text-right text-xs font-black text-slate-400">${isDir ? '--' : formatBytes(file.size)}</div>
-            <div class="col-span-2 text-right flex justify-end gap-1">
-                ${!isProtected && !isDir ? `<button class="btn-preview p-2.5 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition" title="Pré-visualizar"><i class="fas fa-eye text-xs"></i></button>` : ''}
+            <div class="col-span-3 md:col-span-2 text-right text-xs font-black text-slate-400 hidden sm:block">${isDir ? '--' : formatBytes(file.size)}</div>
+            <div class="col-span-5 sm:col-span-2 text-right flex justify-end gap-1">
+                ${!isProtected && !isDir ? `<button class="btn-preview p-2 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition" title="Pré-visualizar"><i class="fas fa-eye text-xs"></i></button>` : ''}
                 ${!isProtected ? `
-                    <button class="btn-move p-2.5 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition" title="Mover"><i class="fas fa-exchange-alt text-xs"></i></button>
-                    <button class="btn-rename p-2.5 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition" title="Renomear"><i class="fas fa-pen text-xs"></i></button>
-                    <button class="btn-delete p-2.5 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-500 transition" title="Eliminar"><i class="fas fa-trash-alt text-xs"></i></button>
-                ` : `<div class="p-2.5 text-slate-200"><i class="fas fa-lock text-xs"></i></div>`}
+                    <button class="btn-move p-2 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition" title="Mover"><i class="fas fa-exchange-alt text-xs"></i></button>
+                    <button class="btn-rename p-2 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition" title="Renomear"><i class="fas fa-pen text-xs"></i></button>
+                    <button class="btn-delete p-2 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-500 transition" title="Eliminar"><i class="fas fa-trash-alt text-xs"></i></button>
+                ` : `<div class="p-2 text-slate-200"><i class="fas fa-lock text-xs"></i></div>`}
             </div>
         `;
+        
         item.onclick = (e) => { if (e.target.closest('button')) return; if (isDir) loadFiles(file.path); else openPreview(file); };
+        
         if (!isProtected) {
             item.querySelector('.btn-preview')?.addEventListener('click', (e) => { e.stopPropagation(); openPreview(file); });
             item.querySelector('.btn-move').addEventListener('click', (e) => { e.stopPropagation(); openModal('move', file); });
@@ -284,29 +327,58 @@ function renderGridView() {
         if (a.type === b.type) return a.name.localeCompare(b.name);
         return a.type === 'dir' ? -1 : 1;
     });
+    
     elements.fileList.innerHTML = '';
     if (state.files.length === 0) {
         elements.fileList.innerHTML = '<div class="p-20 text-center text-slate-300 font-bold">Pasta Vazia</div>';
         return;
     }
+    
     let colClass, iconSizeClass, textSizeClass, nameMaxLines;
     switch (state.iconSize) {
-        case 'small': colClass = 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8'; iconSizeClass = 'w-16 h-16'; textSizeClass = 'text-xs'; nameMaxLines = 'line-clamp-1'; break;
-        case 'medium': colClass = 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'; iconSizeClass = 'w-24 h-24'; textSizeClass = 'text-sm'; nameMaxLines = 'line-clamp-2'; break;
-        case 'large': colClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'; iconSizeClass = 'w-32 h-32'; textSizeClass = 'text-base'; nameMaxLines = 'line-clamp-2'; break;
-        case 'xlarge': colClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3'; iconSizeClass = 'w-40 h-40'; textSizeClass = 'text-lg'; nameMaxLines = 'line-clamp-3'; break;
-        default: colClass = 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'; iconSizeClass = 'w-24 h-24'; textSizeClass = 'text-sm'; nameMaxLines = 'line-clamp-2';
+        case 'small': 
+            colClass = 'grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6'; 
+            iconSizeClass = 'w-20 h-20'; 
+            textSizeClass = 'text-xs'; 
+            nameMaxLines = 'line-clamp-1'; 
+            break;
+        case 'medium': 
+            colClass = 'grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'; 
+            iconSizeClass = 'w-28 h-28'; 
+            textSizeClass = 'text-sm'; 
+            nameMaxLines = 'line-clamp-2'; 
+            break;
+        case 'large': 
+            colClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3'; 
+            iconSizeClass = 'w-36 h-36'; 
+            textSizeClass = 'text-base'; 
+            nameMaxLines = 'line-clamp-2'; 
+            break;
+        case 'xlarge': 
+            colClass = 'grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2'; 
+            iconSizeClass = 'w-48 h-48'; 
+            textSizeClass = 'text-lg'; 
+            nameMaxLines = 'line-clamp-3'; 
+            break;
+        default: 
+            colClass = 'grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'; 
+            iconSizeClass = 'w-28 h-28'; 
+            textSizeClass = 'text-sm'; 
+            nameMaxLines = 'line-clamp-2';
     }
-    elements.fileList.className = `grid ${colClass} gap-6 p-4`;
+    
+    elements.fileList.className = `grid ${colClass} gap-3 md:gap-6 p-3 md:p-4`;
+    
     sorted.forEach(file => {
         const isDir = file.type === 'dir';
         const isProtected = (PROTECTED_FILES.includes(file.name) && state.currentPath === '') || (PROTECTED_FOLDERS.includes(file.name) && state.currentPath === '');
         const card = document.createElement('div');
         card.className = `file-item group bg-white rounded-2xl border border-slate-100 hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer ${isProtected ? 'opacity-60' : ''}`;
         const thumbnailHtml = getFileIcon(file);
+        
         card.innerHTML = `
             <div class="relative">
-                <div class="flex items-center justify-center p-4 bg-slate-50 ${iconSizeClass} w-full mx-auto">
+                <div class="flex items-center justify-center p-3 md:p-4 bg-slate-50 ${iconSizeClass} w-full mx-auto">
                     ${thumbnailHtml}
                 </div>
                 ${!isProtected ? `
@@ -318,13 +390,15 @@ function renderGridView() {
                     </div>
                 ` : `<div class="absolute top-2 right-2 p-1.5 bg-white/80 rounded-full text-slate-400"><i class="fas fa-lock text-xs"></i></div>`}
             </div>
-            <div class="p-3 text-center border-t border-slate-50">
+            <div class="p-2 md:p-3 text-center border-t border-slate-50">
                 <p class="font-bold ${textSizeClass} text-slate-700 ${nameMaxLines}" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</p>
-                ${!isDir ? `<p class="text-xs text-slate-400 mt-1">${formatBytes(file.size)}</p>` : ''}
-                ${isProtected ? `<p class="text-[10px] font-black text-amber-600 mt-1"><i class="fas fa-shield-alt"></i> Protegido</p>` : ''}
+                ${!isDir ? `<p class="text-[10px] md:text-xs text-slate-400 mt-1">${formatBytes(file.size)}</p>` : ''}
+                ${isProtected ? `<p class="text-[8px] md:text-[10px] font-black text-amber-600 mt-1"><i class="fas fa-shield-alt"></i> Protegido</p>` : ''}
             </div>
         `;
+        
         card.onclick = (e) => { if (e.target.closest('button')) return; if (isDir) loadFiles(file.path); else openPreview(file); };
+        
         if (!isProtected) {
             if (!isDir) card.querySelector('.btn-preview-grid')?.addEventListener('click', (e) => { e.stopPropagation(); openPreview(file); });
             card.querySelector('.btn-move-grid').addEventListener('click', (e) => { e.stopPropagation(); openModal('move', file); });
@@ -338,6 +412,7 @@ function renderGridView() {
 function renderFileList() {
     if (state.viewMode === 'list') renderListView();
     else renderGridView();
+    
     if (elements.searchInput.value) {
         const term = elements.searchInput.value.toLowerCase();
         document.querySelectorAll('.file-item').forEach(item => {
@@ -347,23 +422,30 @@ function renderFileList() {
     }
 }
 
-// --- FUNÇÕES BASE (login, upload, delete, etc.) ---
+// --- FUNÇÕES BASE ---
 async function login() {
     const token = elements.tokenInput.value.trim();
     if (!token) return;
+    
     try {
         updateStatus('A autenticar...');
         const res = await fetch('https://api.github.com/user', { headers: { 'Authorization': `token ${token}` } });
         if (!res.ok) throw new Error('Token inválido.');
         const data = await res.json();
         state.owner = data.login;
+        
         const urlParts = window.location.hostname.split('.');
-        if (urlParts[1] === 'github' && urlParts[2] === 'io') state.repo = window.location.pathname.split('/')[1];
-        else state.repo = localStorage.getItem('gh_repo') || prompt("Nome do repositório:", "github-cloud-storage");
+        if (urlParts[1] === 'github' && urlParts[2] === 'io') {
+            state.repo = window.location.pathname.split('/')[1];
+        } else {
+            state.repo = localStorage.getItem('gh_repo') || prompt("Nome do repositório:", "github-cloud-storage");
+        }
+        
         if (!state.repo) return;
         state.token = token;
         localStorage.setItem('gh_token', token);
         localStorage.setItem('gh_repo', state.repo);
+        
         showApp();
         await refreshAll();
     } catch (e) { alert(e.message); logout(); }
@@ -386,15 +468,20 @@ function showApp() {
     elements.repoInfo.textContent = `${state.owner}/${state.repo}`;
 }
 
-async function refreshAll() { await loadFiles(); await calculateStats(); }
+async function refreshAll() { 
+    await loadFiles(); 
+    await calculateStats(); 
+}
 
 async function loadFiles(path = state.currentPath) {
     state.currentPath = path;
     updateStatus('A ler diretório...');
     renderBreadcrumbs();
+    
     try {
         const res = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/contents/${path}`, {
-            headers: { 'Authorization': `token ${state.token}` }, cache: 'no-store'
+            headers: { 'Authorization': `token ${state.token}` }, 
+            cache: 'no-store'
         });
         state.files = res.ok ? await res.json() : [];
         renderFileList();
@@ -408,14 +495,18 @@ async function calculateStats() {
         const repoRes = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}`, { headers: { 'Authorization': `token ${state.token}` } });
         const repoData = await repoRes.json();
         state.totalSize = repoData.size * 1024;
+        
         const branchRes = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/branches/main`, { headers: { 'Authorization': `token ${state.token}` } });
         const branchData = await branchRes.json();
+        
         const treeRes = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/git/trees/${branchData.commit.commit.tree.sha}?recursive=1`, { headers: { 'Authorization': `token ${state.token}` } });
         const treeData = await treeRes.json();
+        
         const filesOnly = treeData.tree.filter(item => item.type === 'blob');
         state.totalCount = filesOnly.length;
         state.allFolders = treeData.tree.filter(item => item.type === 'tree').map(item => item.path);
         state.allFolders.unshift('');
+        
         updateStatsUI();
     } catch (e) { console.error("Erro nas estatísticas:", e); }
 }
@@ -436,6 +527,7 @@ function updateFolderStats() {
 
 async function deleteItem(file) {
     if (!confirm(`Deseja eliminar "${file.name}"?`)) return;
+    
     try {
         updateStatus('A eliminar...');
         const res = await fetch(file.url, {
@@ -452,6 +544,7 @@ async function uploadToGithub(path, content, message, isBase64 = false) {
     let sha = null;
     const check = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/contents/${path}`, { headers: { 'Authorization': `token ${state.token}` } });
     if (check.ok) { const data = await check.json(); sha = data.sha; }
+    
     const res = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/contents/${path}`, {
         method: 'PUT',
         headers: { 'Authorization': `token ${state.token}`, 'Content-Type': 'application/json' },
@@ -466,6 +559,7 @@ function openModal(type, item = null) {
     elements.modalInput.classList.remove('hidden');
     elements.genericInputContainer.classList.add('hidden');
     elements.moveFolderSelectContainer.classList.add('hidden');
+    
     if (type === 'folder') {
         elements.modalTitle.textContent = "Nova Pasta";
         elements.modalSubtitle.textContent = "Criação";
@@ -501,6 +595,7 @@ function openModal(type, item = null) {
 async function handleModalConfirm() {
     const value = elements.genericInput.value.trim();
     const targetFolder = elements.moveFolderSelect.value;
+    
     try {
         if (state.modalAction === 'folder') {
             if (!value) return;
@@ -557,12 +652,13 @@ function updateStatus(msg) { elements.statusMsg.textContent = msg; }
 function renderBreadcrumbs() {
     elements.breadcrumbs.innerHTML = `<li><a href="#" class="text-indigo-600 hover:text-indigo-800 transition" onclick="loadFiles('')">Raiz</a></li>`;
     if (!state.currentPath) return;
+    
     const parts = state.currentPath.split('/');
     let acc = '';
     parts.forEach((p, i) => {
         acc += (i === 0 ? '' : '/') + p;
         const current = acc;
-        elements.breadcrumbs.innerHTML += `<li class="flex items-center gap-2"><i class="fas fa-chevron-right text-slate-300 text-[10px]"></i><a href="#" class="${i === parts.length - 1 ? 'text-slate-400 cursor-default' : 'text-indigo-600 hover:text-indigo-800 transition'}" onclick="${i === parts.length - 1 ? '' : `loadFiles('${current}')`}">${p}</a></li>`;
+        elements.breadcrumbs.innerHTML += `<li class="flex items-center gap-1 md:gap-2"><i class="fas fa-chevron-right text-slate-300 text-[8px] md:text-[10px]"></i><a href="#" class="${i === parts.length - 1 ? 'text-slate-400 cursor-default' : 'text-indigo-600 hover:text-indigo-800 transition'} text-xs md:text-sm" onclick="${i === parts.length - 1 ? '' : `loadFiles('${current}')`}">${p}</a></li>`;
     });
 }
 
@@ -591,6 +687,7 @@ elements.btnRefresh.onclick = refreshAll;
 elements.btnNewFolder.onclick = () => openModal('folder');
 elements.btnModalCancel.onclick = closeModal;
 elements.btnModalConfirm.onclick = handleModalConfirm;
+
 elements.fileUpload.onchange = (e) => {
     const files = e.target.files;
     if (!files.length) return;
@@ -606,6 +703,7 @@ elements.fileUpload.onchange = (e) => {
         elements.fileUpload.value = '';
     })();
 };
+
 elements.searchInput.oninput = (e) => {
     const term = e.target.value.toLowerCase();
     document.querySelectorAll('.file-item').forEach(item => {
@@ -613,6 +711,7 @@ elements.searchInput.oninput = (e) => {
         if (nameSpan) item.style.display = nameSpan.textContent.toLowerCase().includes(term) ? '' : 'none';
     });
 };
+
 elements.dropZone.ondragover = (e) => { e.preventDefault(); elements.dropZone.classList.add('bg-indigo-50/30'); };
 elements.dropZone.ondragleave = () => elements.dropZone.classList.remove('bg-indigo-50/30');
 elements.dropZone.ondrop = (e) => { e.preventDefault(); elements.dropZone.classList.remove('bg-indigo-50/30'); elements.fileUpload.onchange({target: {files: e.dataTransfer.files}}); };
