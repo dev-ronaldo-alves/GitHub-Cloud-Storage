@@ -50,7 +50,8 @@ const elements = {
     totalFileCount: document.getElementById('total-file-count'),
     storageProgress: document.getElementById('storage-progress'),
     folderFileCount: document.getElementById('folder-file-count'),
-    folderStorageUsage: document.getElementById('folder-storage-usage')
+    folderStorageUsage: document.getElementById('folder-storage-usage'),
+    btnBack: null // será criado dinamicamente
 };
 
 // --- BARRA DE CONTROLO VISUAL ---
@@ -458,6 +459,11 @@ function logout() {
     elements.userSection.classList.add('hidden');
     elements.welcomeScreen.classList.remove('hidden');
     elements.appContent.classList.add('hidden');
+    // Reset do botão voltar se existir
+    if (elements.btnBack) {
+        elements.btnBack.disabled = false;
+        elements.btnBack.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
 }
 
 function showApp() {
@@ -473,12 +479,66 @@ async function refreshAll() {
     await calculateStats(); 
 }
 
+// --- FUNÇÃO PARA VOLTAR PASTA ANTERIOR ---
+async function goBack() {
+    if (!state.currentPath) return;
+    
+    // Obtém o caminho pai
+    const pathParts = state.currentPath.split('/');
+    pathParts.pop();
+    const parentPath = pathParts.join('/');
+    
+    await loadFiles(parentPath);
+}
+
+// --- ATUALIZAR ESTADO DO BOTÃO VOLTAR ---
+function updateBackButtonState() {
+    if (!elements.btnBack) return;
+    if (!state.currentPath) {
+        elements.btnBack.disabled = true;
+        elements.btnBack.classList.add('opacity-50', 'cursor-not-allowed');
+        elements.btnBack.classList.remove('hover:bg-indigo-100', 'hover:text-indigo-600');
+    } else {
+        elements.btnBack.disabled = false;
+        elements.btnBack.classList.remove('opacity-50', 'cursor-not-allowed');
+        elements.btnBack.classList.add('hover:bg-indigo-100', 'hover:text-indigo-600');
+    }
+}
+
+// --- GARANTIR QUE O BOTÃO VOLTAR EXISTE NO DOM ---
+function ensureBackButton() {
+    if (elements.btnBack) return;
+    
+    const backBtn = document.createElement('button');
+    backBtn.id = 'btn-back';
+    backBtn.className = 'px-4 py-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-indigo-100 hover:text-indigo-600 transition flex items-center gap-2 text-sm font-bold';
+    backBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Voltar';
+    backBtn.title = 'Pasta anterior';
+    
+    // Insere após o botão Nova Pasta
+    const newFolderBtn = elements.btnNewFolder;
+    if (newFolderBtn && newFolderBtn.parentNode) {
+        newFolderBtn.parentNode.insertBefore(backBtn, newFolderBtn.nextSibling);
+    } else {
+        // fallback: coloca ao lado do repo-info
+        const repoInfo = elements.repoInfo;
+        if (repoInfo && repoInfo.parentNode) {
+            repoInfo.parentNode.appendChild(backBtn);
+        }
+    }
+    
+    elements.btnBack = backBtn;
+    elements.btnBack.onclick = goBack;
+    updateBackButtonState();
+}
+
 async function loadFiles(path = state.currentPath) {
     state.currentPath = path;
-    updateStatus('A ler diretório...');
+    updateBackButtonState();
     renderBreadcrumbs();
     
     try {
+        updateStatus('A ler diretório...');
         const res = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/contents/${path}`, {
             headers: { 'Authorization': `token ${state.token}` }, 
             cache: 'no-store'
@@ -673,6 +733,7 @@ function escapeHtml(str) {
 
 // --- INIT E LISTENERS ---
 async function init() {
+    ensureBackButton(); // cria o botão voltar se não existir
     if (state.token) {
         elements.tokenInput.value = state.token;
         await login();
