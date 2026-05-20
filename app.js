@@ -789,3 +789,15 @@ if (document.readyState === 'loading') {
 } else {
     init();
 }
+function init() {
+    // Remove qualquer botão 'Voltar' duplicado que possa existir
+    const allBackButtons = document.querySelectorAll('#btn-back');
+    if (allBackButtons.length > 1) {
+        for (let i = 1; i < allBackButtons.length; i++) {
+            allBackButtons[i].remove();
+        }
+    }
+    initElements();
+    setupBackButton();
+    // ... resto do código
+}
