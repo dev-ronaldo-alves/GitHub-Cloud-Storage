@@ -18,231 +18,87 @@ let state = {
     iconSize: 'medium'
 };
 
-const elements = {
-    authSection: document.getElementById('auth-section'),
-    userSection: document.getElementById('user-section'),
-    welcomeScreen: document.getElementById('welcome-screen'),
-    appContent: document.getElementById('app-content'),
-    tokenInput: document.getElementById('github-token'),
-    btnLogin: document.getElementById('btn-login'),
-    btnLogout: document.getElementById('btn-logout'),
-    repoInfo: document.getElementById('repo-info'),
-    fileList: document.getElementById('file-list'),
-    breadcrumbs: document.getElementById('breadcrumbs'),
-    btnNewFolder: document.getElementById('btn-new-folder'),
-    fileUpload: document.getElementById('file-upload'),
-    statusMsg: document.getElementById('status-msg'),
-    searchInput: document.getElementById('search-input'),
-    btnRefresh: document.getElementById('btn-refresh'),
-    dropZone: document.getElementById('drop-zone'),
-    modalInput: document.getElementById('modal-input'),
-    modalTitle: document.getElementById('modal-title'),
-    modalSubtitle: document.getElementById('modal-subtitle'),
-    modalIcon: document.getElementById('modal-icon'),
-    modalIconBg: document.getElementById('modal-icon-bg'),
-    genericInput: document.getElementById('generic-input'),
-    genericInputContainer: document.getElementById('generic-input-container'),
-    moveFolderSelectContainer: document.getElementById('move-folder-select-container'),
-    moveFolderSelect: document.getElementById('move-folder-select'),
-    btnModalConfirm: document.getElementById('btn-modal-confirm'),
-    btnModalCancel: document.getElementById('btn-modal-cancel'),
-    totalStorageUsage: document.getElementById('total-storage-usage'),
-    totalFileCount: document.getElementById('total-file-count'),
-    storageProgress: document.getElementById('storage-progress'),
-    folderFileCount: document.getElementById('folder-file-count'),
-    folderStorageUsage: document.getElementById('folder-storage-usage'),
-    btnBack: document.getElementById('btn-back') // ✅ Já existe no HTML
-};
+// Elementos do DOM (inicializados após DOMContentLoaded)
+let elements = {};
 
-// --- BARRA DE CONTROLO VISUAL ---
-function createViewControls() {
-    if (document.getElementById('view-controls')) return;
-    
-    const controlsHtml = `
-        <div id="view-controls" class="p-4 border-b border-slate-50 bg-white">
-            <!-- Botões Lista/Grelha -->
-            <div class="flex gap-2 mb-3">
-                <button id="view-list-btn" class="view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md">
-                    <i class="fas fa-list-ul"></i> Lista
-                </button>
-                <button id="view-grid-btn" class="view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200">
-                    <i class="fas fa-th-large"></i> Grelha
-                </button>
-            </div>
-            
-            <!-- Botões de Tamanho -->
-            <div id="size-controls" class="flex gap-2 ${state.viewMode === 'list' ? 'hidden' : ''}">
-                <button id="size-sm" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'small' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
-                    <i class="fas fa-th"></i> P
-                </button>
-                <button id="size-md" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'medium' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
-                    <i class="fas fa-th-large"></i> M
-                </button>
-                <button id="size-lg" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'large' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
-                    <i class="fas fa-border-all"></i> G
-                </button>
-                <button id="size-xl" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'xlarge' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
-                    <i class="fas fa-arrows-alt"></i> XG
-                </button>
-            </div>
-        </div>
-    `;
-    
-    const viewControlsContainer = document.getElementById('view-controls-container');
-    if (viewControlsContainer && !document.getElementById('view-controls')) {
-        viewControlsContainer.innerHTML = controlsHtml;
-    } else if (!document.getElementById('view-controls')) {
-        const listHeader = document.getElementById('list-header');
-        if (listHeader) {
-            listHeader.insertAdjacentHTML('afterend', controlsHtml);
-        }
-    }
-    
-    document.getElementById('view-list-btn')?.addEventListener('click', () => setViewMode('list'));
-    document.getElementById('view-grid-btn')?.addEventListener('click', () => setViewMode('grid'));
-    document.getElementById('size-sm')?.addEventListener('click', () => setIconSize('small'));
-    document.getElementById('size-md')?.addEventListener('click', () => setIconSize('medium'));
-    document.getElementById('size-lg')?.addEventListener('click', () => setIconSize('large'));
-    document.getElementById('size-xl')?.addEventListener('click', () => setIconSize('xlarge'));
+// --- FUNÇÕES AUXILIARES ---
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
-function setViewMode(mode) {
-    state.viewMode = mode;
-    const listBtn = document.getElementById('view-list-btn');
-    const gridBtn = document.getElementById('view-grid-btn');
-    const sizeControls = document.getElementById('size-controls');
-    const listHeader = document.getElementById('list-header');
-    
-    if (listBtn && gridBtn) {
-        if (mode === 'list') {
-            listBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md";
-            gridBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200";
-            if (sizeControls) sizeControls.classList.add('hidden');
-            if (listHeader) listHeader.style.display = 'grid';
-        } else {
-            listBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200";
-            gridBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md";
-            if (sizeControls) sizeControls.classList.remove('hidden');
-            if (listHeader) listHeader.style.display = 'none';
-        }
-    }
-    renderFileList();
-}
-
-function setIconSize(size) {
-    state.iconSize = size;
-    const sizes = ['small', 'medium', 'large', 'xlarge'];
-    const sizeIds = { small: 'sm', medium: 'md', large: 'lg', xlarge: 'xl' };
-    
-    sizes.forEach(s => {
-        const btn = document.getElementById(`size-${sizeIds[s]}`);
-        if (btn) {
-            if (s === size) {
-                btn.className = `size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all bg-indigo-100 text-indigo-600 border border-indigo-200`;
-            } else {
-                btn.className = `size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all bg-slate-100 text-slate-500 hover:bg-slate-200`;
-            }
-        }
+function escapeHtml(str) {
+    return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
     });
-    renderFileList();
 }
 
-// --- MODAL DE PRÉ-VISUALIZAÇÃO ---
-function createPreviewModal() {
-    if (document.getElementById('preview-modal')) return;
-    
-    const modalHTML = `
-        <div id="preview-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-300">
-            <div class="bg-white rounded-3xl shadow-2xl w-11/12 max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-                <div class="flex items-center justify-between p-5 border-b border-slate-100">
-                    <div class="flex items-center gap-3">
-                        <div class="bg-indigo-100 p-2 rounded-xl"><i class="fas fa-eye text-indigo-600"></i></div>
-                        <div>
-                            <h3 class="font-black text-slate-800" id="preview-filename">Pré-visualização</h3>
-                            <p class="text-xs text-slate-400" id="preview-filesize"></p>
-                        </div>
-                    </div>
-                    <button id="close-preview" class="w-8 h-8 rounded-full hover:bg-slate-100 transition flex items-center justify-center text-slate-400 hover:text-red-500">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div id="preview-content" class="flex-1 overflow-auto p-6 bg-slate-50 flex items-center justify-center">
-                    <div class="text-center text-slate-400"><i class="fas fa-spinner fa-pulse text-2xl mb-2 block"></i> A carregar...</div>
-                </div>
-                <div class="p-4 border-t border-slate-100 flex justify-end gap-3">
-                    <a id="preview-download-link" href="#" target="_blank" class="px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 text-sm font-bold hover:bg-indigo-100 transition flex items-center gap-2">
-                        <i class="fas fa-external-link-alt"></i> Abrir original
-                    </a>
-                    <button id="preview-close-btn" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold hover:bg-slate-200 transition">
-                        Fechar
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    
-    const modal = document.getElementById('preview-modal');
-    const closeBtn = document.getElementById('close-preview');
-    const closeBtn2 = document.getElementById('preview-close-btn');
-    const closeModal = () => modal.classList.add('hidden');
-    closeBtn.onclick = closeModal;
-    closeBtn2.onclick = closeModal;
-    modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+function updateStatus(msg) { 
+    if (elements.statusMsg) elements.statusMsg.textContent = msg; 
 }
 
-async function openPreview(file) {
-    if (file.type !== 'file') return;
-    createPreviewModal();
-    
-    const modal = document.getElementById('preview-modal');
-    const filenameSpan = document.getElementById('preview-filename');
-    const filesizeSpan = document.getElementById('preview-filesize');
-    const contentDiv = document.getElementById('preview-content');
-    const downloadLink = document.getElementById('preview-download-link');
-    
-    filenameSpan.textContent = file.name;
-    filesizeSpan.textContent = formatBytes(file.size);
-    downloadLink.href = file.download_url || file.html_url;
-    contentDiv.innerHTML = `<div class="text-center text-slate-400"><i class="fas fa-spinner fa-pulse text-2xl mb-2 block"></i> A carregar conteúdo...</div>`;
-    modal.classList.remove('hidden');
-    
-    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'];
-    const ext = file.name.split('.').pop().toLowerCase();
-    const isImage = imageExtensions.includes(ext);
-    
-    if (isImage && file.download_url) {
-        const img = document.createElement('img');
-        img.src = file.download_url;
-        img.alt = file.name;
-        img.className = 'max-w-full max-h-[70vh] object-contain rounded-xl shadow-md';
-        img.onload = () => { contentDiv.innerHTML = ''; contentDiv.appendChild(img); };
-        img.onerror = () => { contentDiv.innerHTML = `<div class="text-center text-red-500"><i class="fas fa-image-slash text-4xl mb-2 block"></i> Não foi possível carregar a imagem.</div>`; };
-        return;
-    }
-    
-    const textExtensions = ['txt', 'md', 'js', 'html', 'css', 'json', 'xml', 'svg', 'sh', 'py', 'rb', 'php', 'java', 'c', 'cpp', 'h', 'csv', 'log'];
-    const isText = textExtensions.includes(ext) || file.name.includes('.env') || file.name.includes('.gitignore');
-    
-    if (isText && file.size < 1024 * 1024) {
-        try {
-            const response = await fetch(file.download_url);
-            if (!response.ok) throw new Error();
-            const text = await response.text();
-            const pre = document.createElement('pre');
-            pre.className = 'text-sm font-mono bg-slate-800 text-slate-100 p-4 rounded-xl overflow-auto max-h-[60vh] whitespace-pre-wrap';
-            pre.textContent = text;
-            contentDiv.innerHTML = '';
-            contentDiv.appendChild(pre);
-        } catch (err) {
-            contentDiv.innerHTML = `<div class="text-center text-red-500"><i class="fas fa-file-alt text-4xl mb-2 block"></i> Erro ao carregar o texto.<br><a href="${file.download_url}" target="_blank" class="text-indigo-600 underline">Descarregar ficheiro</a></div>`;
-        }
+// --- NAVEGAÇÃO PARA TRÁS ---
+async function goBack() {
+    if (!state.currentPath) return;
+    const pathParts = state.currentPath.split('/');
+    pathParts.pop();
+    const parentPath = pathParts.join('/');
+    await loadFiles(parentPath);
+}
+
+function updateBackButtonState() {
+    if (!elements.btnBack) return;
+    if (!state.currentPath) {
+        elements.btnBack.disabled = true;
+        elements.btnBack.classList.add('opacity-50', 'cursor-not-allowed');
+        elements.btnBack.classList.remove('hover:bg-indigo-100', 'hover:text-indigo-600');
     } else {
-        contentDiv.innerHTML = `<div class="text-center text-slate-500"><i class="fas fa-file fa-4x mb-4 text-slate-300"></i><p class="mb-4">Pré-visualização não disponível para este tipo de ficheiro.</p><a href="${file.download_url}" target="_blank" class="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition"><i class="fas fa-download"></i> Descarregar ficheiro</a></div>`;
+        elements.btnBack.disabled = false;
+        elements.btnBack.classList.remove('opacity-50', 'cursor-not-allowed');
+        elements.btnBack.classList.add('hover:bg-indigo-100', 'hover:text-indigo-600');
     }
 }
 
-// --- FUNÇÃO AUXILIAR PARA ÍCONES/MINIATURAS ---
+// --- GESTÃO DE BOTÃO VOLTAR (SEM DUPLICAÇÃO) ---
+function setupBackButton() {
+    // Remove qualquer botão 'Voltar' duplicado que possa ter sido criado anteriormente
+    document.querySelectorAll('#btn-back').forEach((btn, index) => {
+        if (index > 0) btn.remove();
+    });
+    
+    // Obtém o botão existente
+    const backBtn = document.getElementById('btn-back');
+    if (backBtn) {
+        elements.btnBack = backBtn;
+        elements.btnBack.onclick = goBack;
+        updateBackButtonState();
+    } else {
+        // Fallback seguro: cria apenas se realmente não existir (não deve ocorrer)
+        console.warn("Botão 'Voltar' não encontrado no HTML. Criando um...");
+        const newBtn = document.createElement('button');
+        newBtn.id = 'btn-back';
+        newBtn.className = 'flex items-center gap-1.5 md:gap-2 bg-white border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 px-3 md:px-5 py-2 rounded-xl transition text-xs md:text-sm font-bold text-slate-600 shadow-sm';
+        newBtn.innerHTML = '<i class="fas fa-arrow-left text-amber-500 text-xs md:text-sm"></i><span class="hidden sm:inline">Voltar</span>';
+        newBtn.title = 'Pasta anterior';
+        const container = document.querySelector('.actions-bar, .p-3.md\\:p-4');
+        if (container) {
+            container.prepend(newBtn);
+        } else {
+            document.getElementById('btn-new-folder')?.parentNode?.prepend(newBtn);
+        }
+        elements.btnBack = newBtn;
+        elements.btnBack.onclick = goBack;
+        updateBackButtonState();
+    }
+}
+
+// --- RENDERIZAÇÃO (LISTA E GRELHA) ---
 function getFileIcon(file) {
     if (file.type === 'dir') {
         return `<div class="flex items-center justify-center w-full h-full text-amber-500"><i class="fas fa-folder-open text-4xl"></i></div>`;
@@ -270,7 +126,6 @@ function getFileIcon(file) {
     return `<div class="flex items-center justify-center w-full h-full text-indigo-400"><i class="fas ${iconClass} text-5xl"></i></div>`;
 }
 
-// --- RENDERIZAÇÃO LISTA ---
 function renderListView() {
     const sorted = [...state.files].sort((a, b) => {
         if (a.type === b.type) return a.name.localeCompare(b.name);
@@ -322,7 +177,6 @@ function renderListView() {
     });
 }
 
-// --- RENDERIZAÇÃO GRELHA ---
 function renderGridView() {
     const sorted = [...state.files].sort((a, b) => {
         if (a.type === b.type) return a.name.localeCompare(b.name);
@@ -414,7 +268,7 @@ function renderFileList() {
     if (state.viewMode === 'list') renderListView();
     else renderGridView();
     
-    if (elements.searchInput.value) {
+    if (elements.searchInput && elements.searchInput.value) {
         const term = elements.searchInput.value.toLowerCase();
         document.querySelectorAll('.file-item').forEach(item => {
             const nameEl = item.querySelector('.font-bold');
@@ -423,7 +277,7 @@ function renderFileList() {
     }
 }
 
-// --- FUNÇÕES BASE ---
+// --- FUNÇÕES DE INTERAÇÃO COM GITHUB ---
 async function login() {
     const token = elements.tokenInput.value.trim();
     if (!token) return;
@@ -459,7 +313,6 @@ function logout() {
     elements.userSection.classList.add('hidden');
     elements.welcomeScreen.classList.remove('hidden');
     elements.appContent.classList.add('hidden');
-    // Reset do botão voltar se existir
     if (elements.btnBack) {
         elements.btnBack.disabled = false;
         elements.btnBack.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -477,40 +330,6 @@ function showApp() {
 async function refreshAll() { 
     await loadFiles(); 
     await calculateStats(); 
-}
-
-// --- FUNÇÃO PARA VOLTAR PASTA ANTERIOR ---
-async function goBack() {
-    if (!state.currentPath) return;
-    
-    // Obtém o caminho pai
-    const pathParts = state.currentPath.split('/');
-    pathParts.pop();
-    const parentPath = pathParts.join('/');
-    
-    await loadFiles(parentPath);
-}
-
-// --- ATUALIZAR ESTADO DO BOTÃO VOLTAR ---
-function updateBackButtonState() {
-    if (!elements.btnBack) return;
-    if (!state.currentPath) {
-        elements.btnBack.disabled = true;
-        elements.btnBack.classList.add('opacity-50', 'cursor-not-allowed');
-        elements.btnBack.classList.remove('hover:bg-indigo-100', 'hover:text-indigo-600');
-    } else {
-        elements.btnBack.disabled = false;
-        elements.btnBack.classList.remove('opacity-50', 'cursor-not-allowed');
-        elements.btnBack.classList.add('hover:bg-indigo-100', 'hover:text-indigo-600');
-    }
-}
-
-// --- GARANTIR QUE O BOTÃO VOLTAR ESTÁ CONFIGURADO (SEM CRIAR DUPLICADO) ---
-function setupBackButton() {
-    if (elements.btnBack) {
-        elements.btnBack.onclick = goBack;
-        updateBackButtonState();
-    }
 }
 
 async function loadFiles(path = state.currentPath) {
@@ -671,14 +490,6 @@ function closeModal() {
     state.activeItem = null;
 }
 
-function formatBytes(bytes) {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
-
 function readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -687,8 +498,6 @@ function readFileAsBase64(file) {
         reader.readAsDataURL(file);
     });
 }
-
-function updateStatus(msg) { elements.statusMsg.textContent = msg; }
 
 function renderBreadcrumbs() {
     elements.breadcrumbs.innerHTML = `<li><a href="#" class="text-indigo-600 hover:text-indigo-800 transition" onclick="loadFiles('')">Raiz</a></li>`;
@@ -703,18 +512,269 @@ function renderBreadcrumbs() {
     });
 }
 
-function escapeHtml(str) {
-    return str.replace(/[&<>]/g, function(m) {
-        if (m === '&') return '&amp;';
-        if (m === '<') return '&lt;';
-        if (m === '>') return '&gt;';
-        return m;
-    });
+// --- PRÉ-VISUALIZAÇÃO ---
+function createPreviewModal() {
+    if (document.getElementById('preview-modal')) return;
+    
+    const modalHTML = `
+        <div id="preview-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-300">
+            <div class="bg-white rounded-3xl shadow-2xl w-11/12 max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                <div class="flex items-center justify-between p-5 border-b border-slate-100">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-indigo-100 p-2 rounded-xl"><i class="fas fa-eye text-indigo-600"></i></div>
+                        <div>
+                            <h3 class="font-black text-slate-800" id="preview-filename">Pré-visualização</h3>
+                            <p class="text-xs text-slate-400" id="preview-filesize"></p>
+                        </div>
+                    </div>
+                    <button id="close-preview" class="w-8 h-8 rounded-full hover:bg-slate-100 transition flex items-center justify-center text-slate-400 hover:text-red-500">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="preview-content" class="flex-1 overflow-auto p-6 bg-slate-50 flex items-center justify-center">
+                    <div class="text-center text-slate-400"><i class="fas fa-spinner fa-pulse text-2xl mb-2 block"></i> A carregar...</div>
+                </div>
+                <div class="p-4 border-t border-slate-100 flex justify-end gap-3">
+                    <a id="preview-download-link" href="#" target="_blank" class="px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 text-sm font-bold hover:bg-indigo-100 transition flex items-center gap-2">
+                        <i class="fas fa-external-link-alt"></i> Abrir original
+                    </a>
+                    <button id="preview-close-btn" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold hover:bg-slate-200 transition">
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    const modal = document.getElementById('preview-modal');
+    const closeBtn = document.getElementById('close-preview');
+    const closeBtn2 = document.getElementById('preview-close-btn');
+    const closeModalPreview = () => modal.classList.add('hidden');
+    closeBtn.onclick = closeModalPreview;
+    closeBtn2.onclick = closeModalPreview;
+    modal.onclick = (e) => { if (e.target === modal) closeModalPreview(); };
 }
 
-// --- INIT E LISTENERS ---
+async function openPreview(file) {
+    if (file.type !== 'file') return;
+    createPreviewModal();
+    
+    const modal = document.getElementById('preview-modal');
+    const filenameSpan = document.getElementById('preview-filename');
+    const filesizeSpan = document.getElementById('preview-filesize');
+    const contentDiv = document.getElementById('preview-content');
+    const downloadLink = document.getElementById('preview-download-link');
+    
+    filenameSpan.textContent = file.name;
+    filesizeSpan.textContent = formatBytes(file.size);
+    downloadLink.href = file.download_url || file.html_url;
+    contentDiv.innerHTML = `<div class="text-center text-slate-400"><i class="fas fa-spinner fa-pulse text-2xl mb-2 block"></i> A carregar conteúdo...</div>`;
+    modal.classList.remove('hidden');
+    
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'];
+    const ext = file.name.split('.').pop().toLowerCase();
+    const isImage = imageExtensions.includes(ext);
+    
+    if (isImage && file.download_url) {
+        const img = document.createElement('img');
+        img.src = file.download_url;
+        img.alt = file.name;
+        img.className = 'max-w-full max-h-[70vh] object-contain rounded-xl shadow-md';
+        img.onload = () => { contentDiv.innerHTML = ''; contentDiv.appendChild(img); };
+        img.onerror = () => { contentDiv.innerHTML = `<div class="text-center text-red-500"><i class="fas fa-image-slash text-4xl mb-2 block"></i> Não foi possível carregar a imagem.</div>`; };
+        return;
+    }
+    
+    const textExtensions = ['txt', 'md', 'js', 'html', 'css', 'json', 'xml', 'svg', 'sh', 'py', 'rb', 'php', 'java', 'c', 'cpp', 'h', 'csv', 'log'];
+    const isText = textExtensions.includes(ext) || file.name.includes('.env') || file.name.includes('.gitignore');
+    
+    if (isText && file.size < 1024 * 1024) {
+        try {
+            const response = await fetch(file.download_url);
+            if (!response.ok) throw new Error();
+            const text = await response.text();
+            const pre = document.createElement('pre');
+            pre.className = 'text-sm font-mono bg-slate-800 text-slate-100 p-4 rounded-xl overflow-auto max-h-[60vh] whitespace-pre-wrap';
+            pre.textContent = text;
+            contentDiv.innerHTML = '';
+            contentDiv.appendChild(pre);
+        } catch (err) {
+            contentDiv.innerHTML = `<div class="text-center text-red-500"><i class="fas fa-file-alt text-4xl mb-2 block"></i> Erro ao carregar o texto.<br><a href="${file.download_url}" target="_blank" class="text-indigo-600 underline">Descarregar ficheiro</a></div>`;
+        }
+    } else {
+        contentDiv.innerHTML = `<div class="text-center text-slate-500"><i class="fas fa-file fa-4x mb-4 text-slate-300"></i><p class="mb-4">Pré-visualização não disponível para este tipo de ficheiro.</p><a href="${file.download_url}" target="_blank" class="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition"><i class="fas fa-download"></i> Descarregar ficheiro</a></div>`;
+    }
+}
+
+// --- CONTROLES DE VISUALIZAÇÃO ---
+function createViewControls() {
+    if (document.getElementById('view-controls')) return;
+    
+    const controlsHtml = `
+        <div id="view-controls" class="p-4 border-b border-slate-50 bg-white">
+            <div class="flex gap-2 mb-3">
+                <button id="view-list-btn" class="view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md">
+                    <i class="fas fa-list-ul"></i> Lista
+                </button>
+                <button id="view-grid-btn" class="view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200">
+                    <i class="fas fa-th-large"></i> Grelha
+                </button>
+            </div>
+            <div id="size-controls" class="flex gap-2 ${state.viewMode === 'list' ? 'hidden' : ''}">
+                <button id="size-sm" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'small' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
+                    <i class="fas fa-th"></i> P
+                </button>
+                <button id="size-md" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'medium' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
+                    <i class="fas fa-th-large"></i> M
+                </button>
+                <button id="size-lg" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'large' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
+                    <i class="fas fa-border-all"></i> G
+                </button>
+                <button id="size-xl" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'xlarge' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
+                    <i class="fas fa-arrows-alt"></i> XG
+                </button>
+            </div>
+        </div>
+    `;
+    
+    const viewControlsContainer = document.getElementById('view-controls-container');
+    if (viewControlsContainer && !document.getElementById('view-controls')) {
+        viewControlsContainer.innerHTML = controlsHtml;
+    } else if (!document.getElementById('view-controls')) {
+        const listHeader = document.getElementById('list-header');
+        if (listHeader) {
+            listHeader.insertAdjacentHTML('afterend', controlsHtml);
+        }
+    }
+    
+    document.getElementById('view-list-btn')?.addEventListener('click', () => setViewMode('list'));
+    document.getElementById('view-grid-btn')?.addEventListener('click', () => setViewMode('grid'));
+    document.getElementById('size-sm')?.addEventListener('click', () => setIconSize('small'));
+    document.getElementById('size-md')?.addEventListener('click', () => setIconSize('medium'));
+    document.getElementById('size-lg')?.addEventListener('click', () => setIconSize('large'));
+    document.getElementById('size-xl')?.addEventListener('click', () => setIconSize('xlarge'));
+}
+
+function setViewMode(mode) {
+    state.viewMode = mode;
+    const listBtn = document.getElementById('view-list-btn');
+    const gridBtn = document.getElementById('view-grid-btn');
+    const sizeControls = document.getElementById('size-controls');
+    const listHeader = document.getElementById('list-header');
+    
+    if (listBtn && gridBtn) {
+        if (mode === 'list') {
+            listBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md";
+            gridBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200";
+            if (sizeControls) sizeControls.classList.add('hidden');
+            if (listHeader) listHeader.style.display = 'grid';
+        } else {
+            listBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200";
+            gridBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md";
+            if (sizeControls) sizeControls.classList.remove('hidden');
+            if (listHeader) listHeader.style.display = 'none';
+        }
+    }
+    renderFileList();
+}
+
+function setIconSize(size) {
+    state.iconSize = size;
+    const sizes = ['small', 'medium', 'large', 'xlarge'];
+    const sizeIds = { small: 'sm', medium: 'md', large: 'lg', xlarge: 'xl' };
+    
+    sizes.forEach(s => {
+        const btn = document.getElementById(`size-${sizeIds[s]}`);
+        if (btn) {
+            if (s === size) {
+                btn.className = `size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all bg-indigo-100 text-indigo-600 border border-indigo-200`;
+            } else {
+                btn.className = `size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all bg-slate-100 text-slate-500 hover:bg-slate-200`;
+            }
+        }
+    });
+    renderFileList();
+}
+
+// --- INICIALIZAÇÃO ---
+function initElements() {
+    elements = {
+        authSection: document.getElementById('auth-section'),
+        userSection: document.getElementById('user-section'),
+        welcomeScreen: document.getElementById('welcome-screen'),
+        appContent: document.getElementById('app-content'),
+        tokenInput: document.getElementById('github-token'),
+        btnLogin: document.getElementById('btn-login'),
+        btnLogout: document.getElementById('btn-logout'),
+        repoInfo: document.getElementById('repo-info'),
+        fileList: document.getElementById('file-list'),
+        breadcrumbs: document.getElementById('breadcrumbs'),
+        btnNewFolder: document.getElementById('btn-new-folder'),
+        fileUpload: document.getElementById('file-upload'),
+        statusMsg: document.getElementById('status-msg'),
+        searchInput: document.getElementById('search-input'),
+        btnRefresh: document.getElementById('btn-refresh'),
+        dropZone: document.getElementById('drop-zone'),
+        modalInput: document.getElementById('modal-input'),
+        modalTitle: document.getElementById('modal-title'),
+        modalSubtitle: document.getElementById('modal-subtitle'),
+        modalIcon: document.getElementById('modal-icon'),
+        modalIconBg: document.getElementById('modal-icon-bg'),
+        genericInput: document.getElementById('generic-input'),
+        genericInputContainer: document.getElementById('generic-input-container'),
+        moveFolderSelectContainer: document.getElementById('move-folder-select-container'),
+        moveFolderSelect: document.getElementById('move-folder-select'),
+        btnModalConfirm: document.getElementById('btn-modal-confirm'),
+        btnModalCancel: document.getElementById('btn-modal-cancel'),
+        totalStorageUsage: document.getElementById('total-storage-usage'),
+        totalFileCount: document.getElementById('total-file-count'),
+        storageProgress: document.getElementById('storage-progress'),
+        folderFileCount: document.getElementById('folder-file-count'),
+        folderStorageUsage: document.getElementById('folder-storage-usage')
+    };
+}
+
+function bindEvents() {
+    elements.btnLogin.onclick = login;
+    elements.btnLogout.onclick = logout;
+    elements.btnRefresh.onclick = refreshAll;
+    elements.btnNewFolder.onclick = () => openModal('folder');
+    elements.btnModalCancel.onclick = closeModal;
+    elements.btnModalConfirm.onclick = handleModalConfirm;
+    
+    elements.fileUpload.onchange = (e) => {
+        const files = e.target.files;
+        if (!files.length) return;
+        (async () => {
+            for (const f of files) {
+                try {
+                    updateStatus(`A enviar ${f.name}...`);
+                    const content = await readFileAsBase64(f);
+                    await uploadToGithub(`${state.currentPath ? state.currentPath + '/' : ''}${f.name}`, content, `Upload: ${f.name}`, true);
+                } catch (e) { alert(e.message); }
+            }
+            await refreshAll();
+            elements.fileUpload.value = '';
+        })();
+    };
+    
+    elements.searchInput.oninput = (e) => {
+        const term = e.target.value.toLowerCase();
+        document.querySelectorAll('.file-item').forEach(item => {
+            const nameSpan = item.querySelector('.font-bold');
+            if (nameSpan) item.style.display = nameSpan.textContent.toLowerCase().includes(term) ? '' : 'none';
+        });
+    };
+    
+    elements.dropZone.ondragover = (e) => { e.preventDefault(); elements.dropZone.classList.add('bg-indigo-50/30'); };
+    elements.dropZone.ondragleave = () => elements.dropZone.classList.remove('bg-indigo-50/30');
+    elements.dropZone.ondrop = (e) => { e.preventDefault(); elements.dropZone.classList.remove('bg-indigo-50/30'); elements.fileUpload.onchange({target: {files: e.dataTransfer.files}}); };
+}
+
 async function init() {
-    setupBackButton(); // apenas configura o botão existente
+    initElements();          // só depois de o DOM estar pronto
+    setupBackButton();       // configura o botão existente (remove duplicados)
     if (state.token) {
         elements.tokenInput.value = state.token;
         await login();
@@ -723,39 +783,9 @@ async function init() {
     createViewControls();
 }
 
-elements.btnLogin.onclick = login;
-elements.btnLogout.onclick = logout;
-elements.btnRefresh.onclick = refreshAll;
-elements.btnNewFolder.onclick = () => openModal('folder');
-elements.btnModalCancel.onclick = closeModal;
-elements.btnModalConfirm.onclick = handleModalConfirm;
-
-elements.fileUpload.onchange = (e) => {
-    const files = e.target.files;
-    if (!files.length) return;
-    (async () => {
-        for (const f of files) {
-            try {
-                updateStatus(`A enviar ${f.name}...`);
-                const content = await readFileAsBase64(f);
-                await uploadToGithub(`${state.currentPath ? state.currentPath + '/' : ''}${f.name}`, content, `Upload: ${f.name}`, true);
-            } catch (e) { alert(e.message); }
-        }
-        await refreshAll();
-        elements.fileUpload.value = '';
-    })();
-};
-
-elements.searchInput.oninput = (e) => {
-    const term = e.target.value.toLowerCase();
-    document.querySelectorAll('.file-item').forEach(item => {
-        const nameSpan = item.querySelector('.font-bold');
-        if (nameSpan) item.style.display = nameSpan.textContent.toLowerCase().includes(term) ? '' : 'none';
-    });
-};
-
-elements.dropZone.ondragover = (e) => { e.preventDefault(); elements.dropZone.classList.add('bg-indigo-50/30'); };
-elements.dropZone.ondragleave = () => elements.dropZone.classList.remove('bg-indigo-50/30');
-elements.dropZone.ondrop = (e) => { e.preventDefault(); elements.dropZone.classList.remove('bg-indigo-50/30'); elements.fileUpload.onchange({target: {files: e.dataTransfer.files}}); };
-
-init();
+// Aguarda o DOM carregar completamente
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
