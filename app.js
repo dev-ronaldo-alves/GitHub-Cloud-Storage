@@ -51,7 +51,7 @@ const elements = {
     storageProgress: document.getElementById('storage-progress'),
     folderFileCount: document.getElementById('folder-file-count'),
     folderStorageUsage: document.getElementById('folder-storage-usage'),
-    btnBack: null // será criado dinamicamente
+    btnBack: document.getElementById('btn-back') // ✅ Já existe no HTML
 };
 
 // --- BARRA DE CONTROLO VISUAL ---
@@ -505,31 +505,12 @@ function updateBackButtonState() {
     }
 }
 
-// --- GARANTIR QUE O BOTÃO VOLTAR EXISTE NO DOM ---
-function ensureBackButton() {
-    if (elements.btnBack) return;
-    
-    const backBtn = document.createElement('button');
-    backBtn.id = 'btn-back';
-    backBtn.className = 'px-4 py-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-indigo-100 hover:text-indigo-600 transition flex items-center gap-2 text-sm font-bold';
-    backBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Voltar';
-    backBtn.title = 'Pasta anterior';
-    
-    // Insere após o botão Nova Pasta
-    const newFolderBtn = elements.btnNewFolder;
-    if (newFolderBtn && newFolderBtn.parentNode) {
-        newFolderBtn.parentNode.insertBefore(backBtn, newFolderBtn.nextSibling);
-    } else {
-        // fallback: coloca ao lado do repo-info
-        const repoInfo = elements.repoInfo;
-        if (repoInfo && repoInfo.parentNode) {
-            repoInfo.parentNode.appendChild(backBtn);
-        }
+// --- GARANTIR QUE O BOTÃO VOLTAR ESTÁ CONFIGURADO (SEM CRIAR DUPLICADO) ---
+function setupBackButton() {
+    if (elements.btnBack) {
+        elements.btnBack.onclick = goBack;
+        updateBackButtonState();
     }
-    
-    elements.btnBack = backBtn;
-    elements.btnBack.onclick = goBack;
-    updateBackButtonState();
 }
 
 async function loadFiles(path = state.currentPath) {
@@ -733,7 +714,7 @@ function escapeHtml(str) {
 
 // --- INIT E LISTENERS ---
 async function init() {
-    ensureBackButton(); // cria o botão voltar se não existir
+    setupBackButton(); // apenas configura o botão existente
     if (state.token) {
         elements.tokenInput.value = state.token;
         await login();
