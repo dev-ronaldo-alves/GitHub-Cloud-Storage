@@ -10,14 +10,15 @@ let state = {
     currentPath: '',
     files: [],
     allFolders: [],
+    allFilesTree: [],      // lista de todos os blobs {path, sha}
     totalSize: 0,
     totalCount: 0,
     modalAction: null,
     activeItem: null,
     viewMode: 'list',
     iconSize: 'medium',
-    multiSelectMode: false,      // modo de seleção múltipla
-    selectedItems: new Set()     // armazena paths dos itens selecionados
+    multiSelectMode: false,
+    selectedItems: new Set()
 };
 
 const elements = {
@@ -55,12 +56,11 @@ const elements = {
     folderStorageUsage: document.getElementById('folder-storage-usage')
 };
 
-// --- BOTÕES DE SELEÇÃO MÚLTIPLA (serão criados dinamicamente) ---
+// --- BOTÕES DE SELEÇÃO MÚLTIPLA ---
 let btnMultiSelect, btnDeleteSelected, btnMoveSelected;
 
 function createMultiSelectControls() {
     if (document.getElementById('multi-select-bar')) return;
-    
     const container = document.createElement('div');
     container.id = 'multi-select-bar';
     container.className = 'flex gap-2 p-2 border-b border-slate-100 bg-white';
@@ -75,13 +75,9 @@ function createMultiSelectControls() {
             <i class="fas fa-exchange-alt"></i> Mover selecionados
         </button>
     `;
-    
     const target = elements.btnNewFolder?.parentNode;
-    if (target) {
-        target.insertBefore(container, elements.btnNewFolder);
-    } else {
-        elements.breadcrumbs?.parentNode?.appendChild(container);
-    }
+    if (target) target.insertBefore(container, elements.btnNewFolder);
+    else elements.breadcrumbs?.parentNode?.appendChild(container);
     
     btnMultiSelect = document.getElementById('btn-multi-select');
     btnDeleteSelected = document.getElementById('btn-delete-selected');
@@ -118,20 +114,14 @@ function updateSelectedButtons() {
 // --- BOTÃO VOLTAR ---
 function createBackButton() {
     if (document.getElementById('back-button')) return;
-    
     const backBtn = document.createElement('button');
     backBtn.id = 'back-button';
     backBtn.className = 'px-3 py-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-indigo-100 hover:text-indigo-600 transition flex items-center gap-2 text-sm font-bold';
     backBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Voltar';
     backBtn.onclick = goBack;
-    
     const newFolderBtn = elements.btnNewFolder;
-    if (newFolderBtn && newFolderBtn.parentNode) {
-        newFolderBtn.parentNode.insertBefore(backBtn, newFolderBtn);
-    } else {
-        const breadcrumbParent = elements.breadcrumbs?.parentNode;
-        if (breadcrumbParent) breadcrumbParent.prepend(backBtn);
-    }
+    if (newFolderBtn && newFolderBtn.parentNode) newFolderBtn.parentNode.insertBefore(backBtn, newFolderBtn);
+    else elements.breadcrumbs?.parentNode?.prepend(backBtn);
     updateBackButton();
 }
 
@@ -153,14 +143,12 @@ function goBack() {
     if (!state.currentPath) return;
     const parts = state.currentPath.split('/');
     parts.pop();
-    const parentPath = parts.join('/');
-    loadFiles(parentPath);
+    loadFiles(parts.join('/'));
 }
 
 // --- BARRA DE CONTROLO VISUAL ---
 function createViewControls() {
     if (document.getElementById('view-controls')) return;
-    
     const controlsHtml = `
         <div id="view-controls" class="p-4 border-b border-slate-50 bg-white">
             <div class="flex gap-2 mb-3">
@@ -172,29 +160,16 @@ function createViewControls() {
                 </button>
             </div>
             <div id="size-controls" class="flex gap-2 ${state.viewMode === 'list' ? 'hidden' : ''}">
-                <button id="size-sm" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'small' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
-                    <i class="fas fa-th"></i> P
-                </button>
-                <button id="size-md" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'medium' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
-                    <i class="fas fa-th-large"></i> M
-                </button>
-                <button id="size-lg" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'large' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
-                    <i class="fas fa-border-all"></i> G
-                </button>
-                <button id="size-xl" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${state.iconSize === 'xlarge' ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
-                    <i class="fas fa-arrows-alt"></i> XG
-                </button>
+                <button id="size-sm" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all">P</button>
+                <button id="size-md" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all">M</button>
+                <button id="size-lg" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all">G</button>
+                <button id="size-xl" class="size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all">XG</button>
             </div>
         </div>
     `;
-    
-    const viewControlsContainer = document.getElementById('view-controls-container');
-    if (viewControlsContainer && !document.getElementById('view-controls')) {
-        viewControlsContainer.innerHTML = controlsHtml;
-    } else if (!document.getElementById('view-controls')) {
-        const listHeader = document.getElementById('list-header');
-        if (listHeader) listHeader.insertAdjacentHTML('afterend', controlsHtml);
-    }
+    const container = document.getElementById('view-controls-container');
+    if (container) container.innerHTML = controlsHtml;
+    else document.getElementById('list-header')?.insertAdjacentHTML('afterend', controlsHtml);
     
     document.getElementById('view-list-btn')?.addEventListener('click', () => setViewMode('list'));
     document.getElementById('view-grid-btn')?.addEventListener('click', () => setViewMode('grid'));
@@ -210,17 +185,16 @@ function setViewMode(mode) {
     const gridBtn = document.getElementById('view-grid-btn');
     const sizeControls = document.getElementById('size-controls');
     const listHeader = document.getElementById('list-header');
-    
     if (listBtn && gridBtn) {
         if (mode === 'list') {
             listBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md";
             gridBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200";
-            if (sizeControls) sizeControls.classList.add('hidden');
+            sizeControls?.classList.add('hidden');
             if (listHeader) listHeader.style.display = 'grid';
         } else {
             listBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200";
             gridBtn.className = "view-mode-btn flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md";
-            if (sizeControls) sizeControls.classList.remove('hidden');
+            sizeControls?.classList.remove('hidden');
             if (listHeader) listHeader.style.display = 'none';
         }
     }
@@ -230,15 +204,11 @@ function setViewMode(mode) {
 function setIconSize(size) {
     state.iconSize = size;
     const sizes = ['small', 'medium', 'large', 'xlarge'];
-    const sizeIds = { small: 'sm', medium: 'md', large: 'lg', xlarge: 'xl' };
+    const ids = { small:'sm', medium:'md', large:'lg', xlarge:'xl' };
     sizes.forEach(s => {
-        const btn = document.getElementById(`size-${sizeIds[s]}`);
+        const btn = document.getElementById(`size-${ids[s]}`);
         if (btn) {
-            if (s === size) {
-                btn.className = `size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all bg-indigo-100 text-indigo-600 border border-indigo-200`;
-            } else {
-                btn.className = `size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all bg-slate-100 text-slate-500 hover:bg-slate-200`;
-            }
+            btn.className = `size-btn flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all ${s === size ? 'bg-indigo-100 text-indigo-600 border border-indigo-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`;
         }
     });
     renderFileList();
@@ -247,41 +217,12 @@ function setIconSize(size) {
 // --- MODAL DE PRÉ-VISUALIZAÇÃO ---
 function createPreviewModal() {
     if (document.getElementById('preview-modal')) return;
-    const modalHTML = `
-        <div id="preview-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-300">
-            <div class="bg-white rounded-3xl shadow-2xl w-11/12 max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-                <div class="flex items-center justify-between p-5 border-b border-slate-100">
-                    <div class="flex items-center gap-3">
-                        <div class="bg-indigo-100 p-2 rounded-xl"><i class="fas fa-eye text-indigo-600"></i></div>
-                        <div>
-                            <h3 class="font-black text-slate-800" id="preview-filename">Pré-visualização</h3>
-                            <p class="text-xs text-slate-400" id="preview-filesize"></p>
-                        </div>
-                    </div>
-                    <button id="close-preview" class="w-8 h-8 rounded-full hover:bg-slate-100 transition flex items-center justify-center text-slate-400 hover:text-red-500">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div id="preview-content" class="flex-1 overflow-auto p-6 bg-slate-50 flex items-center justify-center">
-                    <div class="text-center text-slate-400"><i class="fas fa-spinner fa-pulse text-2xl mb-2 block"></i> A carregar...</div>
-                </div>
-                <div class="p-4 border-t border-slate-100 flex justify-end gap-3">
-                    <a id="preview-download-link" href="#" target="_blank" class="px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 text-sm font-bold hover:bg-indigo-100 transition flex items-center gap-2">
-                        <i class="fas fa-external-link-alt"></i> Abrir original
-                    </a>
-                    <button id="preview-close-btn" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold hover:bg-slate-200 transition">
-                        Fechar
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
+    const modalHTML = `<div id="preview-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm"><div class="bg-white rounded-3xl shadow-2xl w-11/12 max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"><div class="flex items-center justify-between p-5 border-b"><div class="flex items-center gap-3"><div class="bg-indigo-100 p-2 rounded-xl"><i class="fas fa-eye text-indigo-600"></i></div><div><h3 class="font-black text-slate-800" id="preview-filename">Pré-visualização</h3><p class="text-xs text-slate-400" id="preview-filesize"></p></div></div><button id="close-preview" class="w-8 h-8 rounded-full hover:bg-slate-100 transition flex items-center justify-center"><i class="fas fa-times"></i></button></div><div id="preview-content" class="flex-1 overflow-auto p-6 bg-slate-50 flex items-center justify-center"><div class="text-center"><i class="fas fa-spinner fa-pulse text-2xl"></i><p>A carregar...</p></div></div><div class="p-4 border-t flex justify-end gap-3"><a id="preview-download-link" href="#" target="_blank" class="px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 text-sm font-bold hover:bg-indigo-100"><i class="fas fa-external-link-alt"></i> Abrir original</a><button id="preview-close-btn" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold hover:bg-slate-200">Fechar</button></div></div></div>`;
     document.body.insertAdjacentHTML('beforeend', modalHTML);
-    
     const modal = document.getElementById('preview-modal');
     document.getElementById('close-preview').onclick = () => modal.classList.add('hidden');
     document.getElementById('preview-close-btn').onclick = () => modal.classList.add('hidden');
-    modal.onclick = (e) => { if (e.target === modal) modal.classList.add('hidden'); };
+    modal.onclick = e => { if (e.target === modal) modal.classList.add('hidden'); };
 }
 
 async function openPreview(file) {
@@ -292,36 +233,35 @@ async function openPreview(file) {
     document.getElementById('preview-filesize').textContent = formatBytes(file.size);
     document.getElementById('preview-download-link').href = file.download_url || file.html_url;
     const contentDiv = document.getElementById('preview-content');
-    contentDiv.innerHTML = `<div class="text-center text-slate-400"><i class="fas fa-spinner fa-pulse text-2xl mb-2 block"></i> A carregar...</div>`;
+    contentDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-pulse text-2xl"></i><p>A carregar...</p></div>';
     modal.classList.remove('hidden');
-    
     const ext = file.name.split('.').pop().toLowerCase();
     const isImage = ['jpg','jpeg','png','gif','webp','svg','bmp','ico'].includes(ext);
     if (isImage && file.download_url) {
         const img = document.createElement('img');
         img.src = file.download_url;
-        img.className = 'max-w-full max-h-[70vh] object-contain rounded-xl shadow-md';
+        img.className = 'max-w-full max-h-[70vh] object-contain';
         img.onload = () => { contentDiv.innerHTML = ''; contentDiv.appendChild(img); };
-        img.onerror = () => { contentDiv.innerHTML = `<div class="text-center text-red-500"><i class="fas fa-image-slash text-4xl mb-2 block"></i> Erro ao carregar imagem.</div>`; };
+        img.onerror = () => { contentDiv.innerHTML = '<div class="text-red-500">Erro ao carregar imagem.</div>'; };
         return;
     }
     const textExts = ['txt','md','js','html','css','json','xml','sh','py','rb','php','java','c','cpp','h','csv','log'];
     const isText = textExts.includes(ext) || file.name.includes('.env');
-    if (isText && file.size < 1024 * 1024) {
+    if (isText && file.size < 1024*1024) {
         try {
-            const response = await fetch(file.download_url);
-            if (!response.ok) throw new Error();
-            const text = await response.text();
+            const res = await fetch(file.download_url);
+            if (!res.ok) throw new Error();
+            const text = await res.text();
             const pre = document.createElement('pre');
             pre.className = 'text-sm font-mono bg-slate-800 text-slate-100 p-4 rounded-xl overflow-auto max-h-[60vh] whitespace-pre-wrap';
             pre.textContent = text;
             contentDiv.innerHTML = '';
             contentDiv.appendChild(pre);
-        } catch (err) {
-            contentDiv.innerHTML = `<div class="text-center text-red-500"><i class="fas fa-file-alt text-4xl mb-2 block"></i> Erro ao carregar texto.<br><a href="${file.download_url}" target="_blank" class="text-indigo-600 underline">Descarregar</a></div>`;
+        } catch {
+            contentDiv.innerHTML = `<div class="text-red-500">Erro ao carregar texto.<br><a href="${file.download_url}" target="_blank">Descarregar</a></div>`;
         }
     } else {
-        contentDiv.innerHTML = `<div class="text-center text-slate-500"><i class="fas fa-file fa-4x mb-4 text-slate-300"></i><p>Pré-visualização não disponível.</p><a href="${file.download_url}" target="_blank" class="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition"><i class="fas fa-download"></i> Descarregar</a></div>`;
+        contentDiv.innerHTML = `<div class="text-center"><i class="fas fa-file fa-4x text-slate-300"></i><p>Pré-visualização não disponível.</p><a href="${file.download_url}" target="_blank" class="inline-block px-5 py-2 bg-indigo-600 text-white rounded-xl">Descarregar</a></div>`;
     }
 }
 
@@ -347,7 +287,7 @@ function getFileIcon(file) {
 function renderCheckbox(file) {
     if (!state.multiSelectMode) return '';
     const checked = state.selectedItems.has(file.path) ? 'checked' : '';
-    return `<input type="checkbox" class="select-item w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" data-path="${file.path}" ${checked}>`;
+    return `<input type="checkbox" class="select-item w-4 h-4 rounded" data-path="${file.path}" ${checked}>`;
 }
 
 function renderListView() {
@@ -365,19 +305,11 @@ function renderListView() {
         const isProtected = (PROTECTED_FILES.includes(file.name) && state.currentPath === '') || (PROTECTED_FOLDERS.includes(file.name) && state.currentPath === '');
         const item = document.createElement('div');
         item.className = `file-item flex flex-wrap sm:flex-nowrap items-center gap-2 px-3 md:px-8 py-4 transition cursor-pointer border-b border-slate-50 ${isProtected ? 'system-file' : ''}`;
-        
         item.innerHTML = `
-            <div class="flex items-center gap-1 flex-shrink-0">
-                ${renderCheckbox(file)}
-            </div>
-            <div class="flex-grow flex items-center gap-3 md:gap-4 overflow-hidden min-w-0">
-                <div class="w-10 h-10 rounded-2xl ${isDir ? 'bg-amber-50 text-amber-500' : 'bg-indigo-50 text-indigo-500'} flex items-center justify-center flex-shrink-0">
-                    <i class="fas ${isDir ? 'fa-folder' : 'fa-file-alt'} text-base"></i>
-                </div>
-                <div class="flex flex-col overflow-hidden">
-                    <span class="truncate font-bold text-slate-700 text-sm">${escapeHtml(file.name)}</span>
-                    ${isProtected ? '<span class="text-[9px] font-black text-indigo-600"><i class="fas fa-shield-alt mr-1"></i>Protegido</span>' : ''}
-                </div>
+            <div class="flex items-center gap-1 flex-shrink-0">${renderCheckbox(file)}</div>
+            <div class="flex-grow flex items-center gap-3 overflow-hidden min-w-0">
+                <div class="w-10 h-10 rounded-2xl ${isDir ? 'bg-amber-50 text-amber-500' : 'bg-indigo-50 text-indigo-500'} flex items-center justify-center"><i class="fas ${isDir ? 'fa-folder' : 'fa-file-alt'} text-base"></i></div>
+                <div class="flex flex-col overflow-hidden"><span class="truncate font-bold text-slate-700 text-sm">${escapeHtml(file.name)}</span>${isProtected ? '<span class="text-[9px] font-black text-indigo-600"><i class="fas fa-shield-alt mr-1"></i>Protegido</span>' : ''}</div>
             </div>
             <div class="text-right text-xs font-black text-slate-400 w-24 hidden sm:block">${isDir ? '--' : formatBytes(file.size)}</div>
             <div class="flex justify-end gap-1 flex-shrink-0">
@@ -389,13 +321,12 @@ function renderListView() {
                 ` : '<div class="p-2"><i class="fas fa-lock text-xs text-slate-200"></i></div>'}
             </div>
         `;
-        
-        item.onclick = (e) => { if (e.target.closest('button') || e.target.closest('.select-item')) return; if (isDir) loadFiles(file.path); else openPreview(file); };
+        item.onclick = e => { if (e.target.closest('button') || e.target.closest('.select-item')) return; if (isDir) loadFiles(file.path); else openPreview(file); };
         if (!isProtected) {
-            item.querySelector('.btn-preview')?.addEventListener('click', (e) => { e.stopPropagation(); openPreview(file); });
-            item.querySelector('.btn-move').addEventListener('click', (e) => { e.stopPropagation(); openModal('move', file); });
-            item.querySelector('.btn-rename').addEventListener('click', (e) => { e.stopPropagation(); openModal('rename', file); });
-            item.querySelector('.btn-delete').addEventListener('click', (e) => { e.stopPropagation(); deleteItem(file); });
+            item.querySelector('.btn-preview')?.addEventListener('click', e => { e.stopPropagation(); openPreview(file); });
+            item.querySelector('.btn-move').addEventListener('click', e => { e.stopPropagation(); openModal('move', file); });
+            item.querySelector('.btn-rename').addEventListener('click', e => { e.stopPropagation(); openModal('rename', file); });
+            item.querySelector('.btn-delete').addEventListener('click', e => { e.stopPropagation(); deleteItem(file); });
         }
         elements.fileList.appendChild(item);
     });
@@ -421,20 +352,15 @@ function renderGridView() {
         default: colClass = 'grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'; iconSizeClass = 'w-28 h-28'; textSizeClass = 'text-sm'; nameMaxLines = 'line-clamp-2';
     }
     elements.fileList.className = `grid ${colClass} gap-3 md:gap-6 p-3 md:p-4`;
-    
     sorted.forEach(file => {
         const isDir = file.type === 'dir';
         const isProtected = (PROTECTED_FILES.includes(file.name) && state.currentPath === '') || (PROTECTED_FOLDERS.includes(file.name) && state.currentPath === '');
         const card = document.createElement('div');
         card.className = `file-item group bg-white rounded-2xl border border-slate-100 hover:shadow-xl transition overflow-hidden cursor-pointer ${isProtected ? 'opacity-60' : ''}`;
-        const thumbnailHtml = getFileIcon(file);
-        
         card.innerHTML = `
             <div class="relative">
                 ${state.multiSelectMode ? `<div class="absolute top-2 left-2 z-10">${renderCheckbox(file)}</div>` : ''}
-                <div class="flex items-center justify-center p-3 md:p-4 bg-slate-50 ${iconSizeClass} w-full mx-auto">
-                    ${thumbnailHtml}
-                </div>
+                <div class="flex items-center justify-center p-3 bg-slate-50 ${iconSizeClass} w-full mx-auto">${getFileIcon(file)}</div>
                 ${!isProtected ? `
                     <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
                         ${!isDir ? `<button class="btn-preview-grid p-1.5 bg-white rounded-full shadow"><i class="fas fa-eye text-xs"></i></button>` : ''}
@@ -444,19 +370,18 @@ function renderGridView() {
                     </div>
                 ` : `<div class="absolute top-2 right-2 p-1.5 bg-white/80 rounded-full"><i class="fas fa-lock text-xs"></i></div>`}
             </div>
-            <div class="p-2 md:p-3 text-center border-t border-slate-50">
+            <div class="p-2 text-center border-t">
                 <p class="font-bold ${textSizeClass} text-slate-700 ${nameMaxLines}" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</p>
-                ${!isDir ? `<p class="text-[10px] md:text-xs text-slate-400 mt-1">${formatBytes(file.size)}</p>` : ''}
+                ${!isDir ? `<p class="text-[10px] text-slate-400 mt-1">${formatBytes(file.size)}</p>` : ''}
                 ${isProtected ? '<p class="text-[8px] font-black text-amber-600"><i class="fas fa-shield-alt"></i> Protegido</p>' : ''}
             </div>
         `;
-        
-        card.onclick = (e) => { if (e.target.closest('button') || e.target.closest('.select-item')) return; if (isDir) loadFiles(file.path); else openPreview(file); };
+        card.onclick = e => { if (e.target.closest('button') || e.target.closest('.select-item')) return; if (isDir) loadFiles(file.path); else openPreview(file); };
         if (!isProtected) {
-            if (!isDir) card.querySelector('.btn-preview-grid')?.addEventListener('click', (e) => { e.stopPropagation(); openPreview(file); });
-            card.querySelector('.btn-move-grid').addEventListener('click', (e) => { e.stopPropagation(); openModal('move', file); });
-            card.querySelector('.btn-rename-grid').addEventListener('click', (e) => { e.stopPropagation(); openModal('rename', file); });
-            card.querySelector('.btn-delete-grid').addEventListener('click', (e) => { e.stopPropagation(); deleteItem(file); });
+            if (!isDir) card.querySelector('.btn-preview-grid')?.addEventListener('click', e => { e.stopPropagation(); openPreview(file); });
+            card.querySelector('.btn-move-grid').addEventListener('click', e => { e.stopPropagation(); openModal('move', file); });
+            card.querySelector('.btn-rename-grid').addEventListener('click', e => { e.stopPropagation(); openModal('rename', file); });
+            card.querySelector('.btn-delete-grid').addEventListener('click', e => { e.stopPropagation(); deleteItem(file); });
         }
         elements.fileList.appendChild(card);
     });
@@ -465,7 +390,7 @@ function renderGridView() {
 
 function attachCheckboxEvents() {
     document.querySelectorAll('.select-item').forEach(cb => {
-        cb.addEventListener('change', (e) => {
+        cb.addEventListener('change', e => {
             e.stopPropagation();
             const path = cb.dataset.path;
             if (cb.checked) state.selectedItems.add(path);
@@ -498,11 +423,8 @@ async function login() {
         const data = await res.json();
         state.owner = data.login;
         const urlParts = window.location.hostname.split('.');
-        if (urlParts[1] === 'github' && urlParts[2] === 'io') {
-            state.repo = window.location.pathname.split('/')[1];
-        } else {
-            state.repo = localStorage.getItem('gh_repo') || prompt("Nome do repositório:", "github-cloud-storage");
-        }
+        if (urlParts[1] === 'github' && urlParts[2] === 'io') state.repo = window.location.pathname.split('/')[1];
+        else state.repo = localStorage.getItem('gh_repo') || prompt("Nome do repositório:", "github-cloud-storage");
         if (!state.repo) return;
         state.token = token;
         localStorage.setItem('gh_token', token);
@@ -536,10 +458,13 @@ async function refreshAll() {
 
 async function loadFiles(path = state.currentPath) {
     state.currentPath = path;
-    // Reset multi-select mode when changing folder
-    if (state.multiSelectMode) toggleMultiSelectMode();
-    state.selectedItems.clear();
-    updateSelectedButtons();
+    // Reset multi-select mode
+    if (state.multiSelectMode) {
+        state.multiSelectMode = false;
+        state.selectedItems.clear();
+        if (btnMultiSelect) btnMultiSelect.innerHTML = '<i class="fas fa-check-square"></i> Selecionar';
+        updateSelectedButtons();
+    }
     updateStatus('A ler diretório...');
     renderBreadcrumbs();
     updateBackButton();
@@ -567,6 +492,8 @@ async function calculateStats() {
         state.totalCount = filesOnly.length;
         state.allFolders = treeData.tree.filter(item => item.type === 'tree').map(item => item.path);
         state.allFolders.unshift('');
+        // Guardar todos os blobs para uso rápido em exclusão/movimentação
+        state.allFilesTree = filesOnly.map(item => ({ path: item.path, sha: item.sha }));
         updateStatsUI();
     } catch (e) { console.error("Erro nas estatísticas:", e); }
 }
@@ -611,27 +538,10 @@ async function uploadToGithub(path, content, message, isBase64 = false) {
     if (!res.ok) throw new Error('Falha no upload.');
 }
 
-// --- EXCLUSÃO MÚLTIPLA RECURSIVA ---
-async function getAllFilesInFolder(folderPath) {
-    const url = `https://api.github.com/repos/${state.owner}/${state.repo}/contents/${folderPath}`;
-    const res = await fetch(url, { headers: { 'Authorization': `token ${state.token}` } });
-    if (!res.ok) return [];
-    const items = await res.json();
-    let files = [];
-    for (const item of items) {
-        if (item.type === 'file') {
-            files.push(item);
-        } else if (item.type === 'dir') {
-            const subFiles = await getAllFilesInFolder(item.path);
-            files.push(...subFiles);
-        }
-    }
-    return files;
-}
-
+// --- EXCLUSÃO MÚLTIPLA OTIMIZADA (usando árvore recursiva) ---
 async function deleteMultipleItems(selectedPaths) {
     if (selectedPaths.length === 0) return;
-    // Build list of all files to delete (expand folders)
+    // Colecionar todos os arquivos (blobs) a excluir
     let filesToDelete = [];
     for (const path of selectedPaths) {
         const item = state.files.find(f => f.path === path);
@@ -639,12 +549,42 @@ async function deleteMultipleItems(selectedPaths) {
         if (item.type === 'file') {
             filesToDelete.push(item);
         } else {
-            const subFiles = await getAllFilesInFolder(item.path);
-            filesToDelete.push(...subFiles);
+            // Filtrar da árvore global todos os arquivos cujo path comece com o caminho da pasta
+            const prefix = item.path + '/';
+            const subFiles = state.allFilesTree.filter(f => f.path.startsWith(prefix));
+            if (subFiles.length === 0) {
+                // Pasta vazia: não há arquivos para excluir. Avisar o utilizador.
+                alert(`A pasta "${item.name}" está vazia. Nada a excluir.`);
+                continue;
+            }
+            // Necessitamos dos objetos completos (com url e sha) para cada arquivo. Mas temos apenas o sha.
+            // Vamos buscar os detalhes de cada arquivo via API? Isso seria lento. 
+            // Alternativa: usar o item da pasta para obter o conteúdo e depois excluir? 
+            // Na verdade, para excluir um arquivo precisamos do sha e da url. A url é construída.
+            // Podemos construir a url: `https://api.github.com/repos/${owner}/${repo}/contents/${path}`
+            // Então não precisamos do objeto completo, apenas do sha e do path.
+            for (const file of subFiles) {
+                filesToDelete.push({
+                    path: file.path,
+                    sha: file.sha,
+                    url: `https://api.github.com/repos/${state.owner}/${state.repo}/contents/${file.path}`
+                });
+            }
         }
     }
-    if (filesToDelete.length === 0) return;
-    const confirmMsg = `Tem certeza que deseja excluir ${filesToDelete.length} ficheiro(s) (incluindo conteúdo de pastas)?`;
+    // Para itens do tipo 'file' que não foram expandidos, já têm url e sha
+    // Precisamos garantir que os itens do tipo 'file' também tenham url. Eles têm a propriedade 'url' do GitHub.
+    filesToDelete = filesToDelete.map(f => ({
+        path: f.path,
+        sha: f.sha,
+        url: f.url || `https://api.github.com/repos/${state.owner}/${state.repo}/contents/${f.path}`
+    }));
+    
+    if (filesToDelete.length === 0) {
+        updateStatus('Nenhum arquivo para excluir.');
+        return;
+    }
+    const confirmMsg = `Tem certeza que deseja excluir ${filesToDelete.length} ficheiro(s)?`;
     if (!confirm(confirmMsg)) return;
     
     let completed = 0;
@@ -673,7 +613,7 @@ async function deleteMultipleItems(selectedPaths) {
     if (state.multiSelectMode) toggleMultiSelectMode();
 }
 
-// --- MOVIMENTAÇÃO MÚLTIPLA ---
+// --- MOVIMENTAÇÃO MÚLTIPLA OTIMIZADA (usando árvore recursiva) ---
 async function moveMultipleItems(selectedPaths, targetFolder) {
     if (selectedPaths.length === 0) return;
     let itemsToMove = [];
@@ -690,14 +630,23 @@ async function moveMultipleItems(selectedPaths, targetFolder) {
             movePlan.push({ oldPath: item.path, newPath, sha: item.sha });
             totalFiles++;
         } else {
-            const filesInside = await getAllFilesInFolder(item.path);
-            for (const file of filesInside) {
+            const prefix = item.path + '/';
+            const subFiles = state.allFilesTree.filter(f => f.path.startsWith(prefix));
+            if (subFiles.length === 0) {
+                alert(`A pasta "${item.name}" está vazia. Nada a mover.`);
+                continue;
+            }
+            for (const file of subFiles) {
                 const relative = file.path.substring(item.path.length + 1);
                 const newPath = targetFolder ? `${targetFolder}/${item.name}/${relative}` : `${item.name}/${relative}`;
                 movePlan.push({ oldPath: file.path, newPath, sha: file.sha });
                 totalFiles++;
             }
         }
+    }
+    if (totalFiles === 0) {
+        updateStatus('Nenhum arquivo para mover.');
+        return;
     }
     const confirmMsg = `Mover ${totalFiles} ficheiro(s) para ${targetFolder === '' ? 'raiz' : targetFolder}?`;
     if (!confirm(confirmMsg)) return;
@@ -707,9 +656,13 @@ async function moveMultipleItems(selectedPaths, targetFolder) {
     updateStatus(`A preparar movimentação de ${totalFiles} ficheiro(s)...`);
     const movePromises = movePlan.map(async ({ oldPath, newPath, sha }) => {
         try {
+            // Obter conteúdo do arquivo original
             const getRes = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/contents/${oldPath}`, { headers: { 'Authorization': `token ${state.token}` } });
+            if (!getRes.ok) throw new Error(`Não foi possível ler ${oldPath}`);
             const data = await getRes.json();
+            // Criar no novo local
             await uploadToGithub(newPath, data.content, `Move to ${targetFolder}`, true);
+            // Excluir original
             const deleteRes = await fetch(`https://api.github.com/repos/${state.owner}/${state.repo}/contents/${oldPath}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `token ${state.token}`, 'Content-Type': 'application/json' },
@@ -748,7 +701,8 @@ function openMoveSelectedModal() {
         opt.textContent = f === '' ? '/ (Raiz)' : f;
         elements.moveFolderSelect.appendChild(opt);
     });
-    elements.moveFolderSelect.value = state.currentPath; // pre-select current? not needed
+    // Não pré-selecionar a pasta atual (evita mover para o mesmo local)
+    elements.moveFolderSelect.value = '';
 }
 
 // --- MODAL PARA AÇÕES INDIVIDUAIS ---
@@ -788,6 +742,7 @@ function openModal(type, item = null) {
             opt.textContent = f === '' ? '/ (Raiz)' : f;
             elements.moveFolderSelect.appendChild(opt);
         });
+        elements.moveFolderSelect.value = '';
     }
 }
 
@@ -858,7 +813,7 @@ function renderBreadcrumbs() {
     parts.forEach((p, i) => {
         acc += (i === 0 ? '' : '/') + p;
         const current = acc;
-        elements.breadcrumbs.innerHTML += `<li class="flex items-center gap-1 md:gap-2"><i class="fas fa-chevron-right text-slate-300 text-[8px] md:text-[10px]"></i><a href="#" class="${i === parts.length - 1 ? 'text-slate-400 cursor-default' : 'text-indigo-600 hover:text-indigo-800 transition'} text-xs md:text-sm" onclick="${i === parts.length - 1 ? '' : `loadFiles('${current}')`}">${p}</a></li>`;
+        elements.breadcrumbs.innerHTML += `<li class="flex items-center gap-1"><i class="fas fa-chevron-right text-slate-300 text-[8px]"></i><a href="#" class="${i === parts.length - 1 ? 'text-slate-400 cursor-default' : 'text-indigo-600 hover:text-indigo-800 transition'} text-xs" onclick="${i === parts.length - 1 ? '' : `loadFiles('${current}')`}">${p}</a></li>`;
     });
 }
 
@@ -902,7 +857,7 @@ async function init() {
     createPreviewModal();
     createViewControls();
     createBackButton();
-    createMultiSelectControls();   // adiciona botões de seleção múltipla
+    createMultiSelectControls();
     elements.fileUpload.setAttribute('multiple', true);
 }
 
