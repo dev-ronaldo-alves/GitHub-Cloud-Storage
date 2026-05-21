@@ -600,6 +600,44 @@ async function uploadToGithub(path, content, message, isBase64 = false) {
     if (!res.ok) throw new Error('Falha no upload.');
 }
 
+// --- FUNÇÕES DE UPLOAD MÚLTIPLO EM PARALELO (NOVAS) ---
+async function uploadMultipleFiles(files) {
+    const total = files.length;
+    let completed = 0;
+    let hasError = false;
+
+    updateStatus(`A preparar ${total} ficheiro(s)...`);
+
+    // Converte cada arquivo em uma Promise de upload
+    const uploadPromises = files.map(async (file) => {
+        try {
+            updateStatus(`A enviar ${file.name} (${completed+1}/${total})...`);
+            const content = await readFileAsBase64(file);
+            const remotePath = state.currentPath ? `${state.currentPath}/${file.name}` : file.name;
+            await uploadToGithub(remotePath, content, `Upload: ${file.name}`, true);
+            completed++;
+            updateStatus(`Enviado ${file.name} (${completed}/${total})`);
+        } catch (err) {
+            console.error(`Erro no upload de ${file.name}:`, err);
+            alert(`Falha ao enviar ${file.name}: ${err.message}`);
+            hasError = true;
+        }
+    });
+
+    // Aguarda todos os uploads terminarem (seja com sucesso ou erro)
+    await Promise.all(uploadPromises);
+
+    if (!hasError) {
+        updateStatus(`${total} ficheiro(s) enviado(s) com sucesso!`);
+    } else {
+        updateStatus(`${completed} de ${total} ficheiro(s) enviados. Verifique os erros.`);
+    }
+
+    // Atualiza a interface e limpa o input
+    await refreshAll();
+    elements.fileUpload.value = '';
+}
+
 function openModal(type, item = null) {
     state.modalAction = type;
     state.activeItem = item;
@@ -727,6 +765,9 @@ async function init() {
     createPreviewModal();
     createViewControls();
     createBackButton();   // Cria o botão Voltar
+
+    // Permite selecionar múltiplos arquivos no input
+    elements.fileUpload.setAttribute('multiple', true);
 }
 
 elements.btnLogin.onclick = login;
@@ -736,20 +777,11 @@ elements.btnNewFolder.onclick = () => openModal('folder');
 elements.btnModalCancel.onclick = closeModal;
 elements.btnModalConfirm.onclick = handleModalConfirm;
 
+// Handler para upload de múltiplos arquivos (paralelo)
 elements.fileUpload.onchange = (e) => {
-    const files = e.target.files;
-    if (!files.length) return;
-    (async () => {
-        for (const f of files) {
-            try {
-                updateStatus(`A enviar ${f.name}...`);
-                const content = await readFileAsBase64(f);
-                await uploadToGithub(`${state.currentPath ? state.currentPath + '/' : ''}${f.name}`, content, `Upload: ${f.name}`, true);
-            } catch (e) { alert(e.message); }
-        }
-        await refreshAll();
-        elements.fileUpload.value = '';
-    })();
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    uploadMultipleFiles(files);
 };
 
 elements.searchInput.oninput = (e) => {
